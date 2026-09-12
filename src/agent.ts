@@ -9,7 +9,7 @@ import { getBalance, placeLimitBuy, getOrder, cancelOrder, sellMarket } from "./
 import { decide, ask, type Candidate } from "./llm";
 import { log, trTime } from "./journal";
 import { flush as anchorFlush, anchorStatus, anchorAddress } from "./anchor";
-import { startCommandLoop } from "./commands";
+import { startCommandLoop, getMode, askApproval } from "./commands";
 import { buildReport } from "./report";
 import { emptyShadow, stepShadow, flattenShadow, shadowSummary, type ShadowState } from "./shadow";
 
@@ -237,6 +237,11 @@ ${journal}`);
       const sz = roundSize(notional / px, i.lotSz, i.minSz);
       if (sz <= 0) { log("reject", `${c.instId}: ${notional.toFixed(2)} USDT minimum lotun altında (minSz ${i.minSz})`); continue; }
       const sl = roundPrice(stopPrice(px, CFG.risk), i.tickSz);
+      if (getMode() === "onaylı") {
+        log("info", `${c.instId}: onaylı mod, sahibine soruluyor (60 sn)`);
+        const ok = await askApproval(`${c.instId} al?\n${sz} @ ${px} (${(sz * px).toFixed(2)} USDT) · SL ${sl} · hedef ${targetPrice(px, c.mid, CFG.exit.targetMinPct).toFixed(6)}\nSeçici: ${pick.reason}`, 60_000);
+        if (!ok) { log("reject", `${c.instId}: sahibi onaylamadı ya da süre doldu (onaylı mod)`); continue; }
+      }
       try {
         const ordId = await placeLimitBuy(atk, { instId: c.instId, px: String(px), sz: String(sz), slPx: String(sl), clOrdId: `ag${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`.slice(0, 32) });
         st.pending[c.instId] = { instId: c.instId, ordId, px, sz, target: c.mid, sl, ts: Date.now(), reason: pick.reason };

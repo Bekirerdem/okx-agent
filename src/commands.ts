@@ -16,6 +16,25 @@ export type CmdCtx = {
 const TG = { token: process.env.TG_BOT_TOKEN ?? "", chat: process.env.TG_CHAT_ID ?? "" };
 let offset = 0;
 
+// Mod: otonom (varsayılan) | onaylı (her girişten önce sahibine sorar, süre dolarsa reddeder)
+export type Mode = "otonom" | "onaylı";
+let mode: Mode = "otonom";
+export function getMode(): Mode { return mode; }
+let pendingApproval: { resolve: (ok: boolean) => void } | null = null;
+const YES = /^(evet|e|yes|ok|tamam|onay|✅)$/i, NO = /^(hayır|hayir|h|no|ret|iptal|❌)$/i;
+
+/** Onaylı modda giriş öncesi soru. Cevap gelmezse false. */
+export function askApproval(question: string, timeoutMs = 60_000): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (pendingApproval) pendingApproval.resolve(false);
+    let done = false;
+    const finish = (ok: boolean) => { if (done) return; done = true; pendingApproval = null; clearTimeout(t); resolve(ok); };
+    const t = setTimeout(() => finish(false), timeoutMs);
+    pendingApproval = { resolve: finish };
+    void telegram(`❓ ONAY GEREKİYOR (${Math.round(timeoutMs / 1000)} sn)\n${question}\nCevap: evet / hayır`);
+  });
+}
+
 const HELP = `Komutlar:
 /durum — özkaynak, kapı, pozisyon, işlem sayısı
 /pozisyon — açık pozisyonlar ve anlık kâr/zarar
@@ -25,7 +44,8 @@ const HELP = `Komutlar:
 /rapor — anlık performans dökümü
 /dur — acil fren: her şeyi sat, yeni işlem yok
 /devam — freni kaldır
-/zincir — X Layer denetim izi durumu`;
+/zincir — X Layer denetim izi durumu
+/mod — otonom | onaylı (onaylı: her girişten önce sana sorar, 60 sn cevap yoksa reddeder)`;
 
 function journalLines(): any[] {
   if (!existsSync(CFG.paths.journal)) return [];
@@ -42,7 +62,7 @@ async function handle(text: string, ctx: CmdCtx): Promise<string> {
     case "/durum":
       const met = (() => { try { return JSON.parse(readFileSync("state/metrics.json", "utf-8")); } catch { return null; } })();
       const hb = met ? Math.round((Date.now() - met.ts) / 1000) : -1;
-      return `📊 Özkaynak ${s.equity.toFixed(2)} USDT (${pct}%) · nabız ${hb >= 0 ? hb + " sn önce" : "?"}${met?.shadow ? "\n🪞 " + met.shadow.summary : ""}\n${s.lastGate || "kapı: henüz tarama yok"}\nAçık ${s.positions.length} · bekleyen ${s.pending.length} · işlem ${s.trades}/${CFG.risk.maxTradesPerDay}\nFren: ${s.halted ? "AKTİF" : "yok"}\nMCP çağrı ${s.mcpCalls}, hata ${s.mcpErrors}\nSon tarama: ${s.lastScan || "-"}`;
+      return `📊 Özkaynak ${s.equity.toFixed(2)} USDT (${pct}%) · nabız ${hb >= 0 ? hb + " sn önce" : "?"} · mod ${mode}${met?.shadow ? "\n🪞 " + met.shadow.summary : ""}\n${s.lastGate || "kapı: henüz tarama yok"}\nAçık ${s.positions.length} · bekleyen ${s.pending.length} · işlem ${s.trades}/${CFG.risk.maxTradesPerDay}\nFren: ${s.halted ? "AKTİF" : "yok"}\nMCP çağrı ${s.mcpCalls}, hata ${s.mcpErrors}\nSon tarama: ${s.lastScan || "-"}`;
     case "/pozisyon": {
       if (!s.positions.length && !s.pending.length) return "Açık pozisyon yok. Nakitteyim.";
       const rows: string[] = [];
@@ -67,6 +87,12 @@ async function handle(text: string, ctx: CmdCtx): Promise<string> {
     case "/dur": await ctx.halt("Telegram /dur"); return "⏸️ Fren çekildi: pozisyonlar satıldı, yeni işlem yok. /devam ile açılır.";
     case "/devam": ctx.resume(); return "▶️ Fren kaldırıldı. Bir sonraki mum kapanışında tarama sürer.";
     case "/zincir": return `⛓️ X Layer denetim izi: ${anchorStatus()}`;
+    case "/mod": {
+      const want = (rest[0] ?? "").toLowerCase();
+      if (want === "onaylı" || want === "onayli") { mode = "onaylı"; log("info", "mod: ONAYLI (girişler sahibinin onayına bağlı)"); return "🤝 Onaylı mod: her girişten önce sana soracağım. 60 sn içinde evet demezsen işlem açılmaz."; }
+      if (want === "otonom") { mode = "otonom"; if (pendingApproval) pendingApproval.resolve(false); log("info", "mod: OTONOM"); return "🤖 Otonom mod: kafes içinde kendi kararımla giriyorum."; }
+      return `Mod: ${mode}. Değiştirmek için /mod onaylı veya /mod otonom`;
+    }
     default: return `Anlamadım: ${cmd}\n${HELP}`;
   }
 }
@@ -82,6 +108,10 @@ export function startCommandLoop(ctx: CmdCtx): void {
         const m = u.message; if (!m?.text) continue;
         if (String(m.chat?.id) !== TG.chat) continue;           // yalnız sahibi
         try {
+          if (pendingApproval && (YES.test(m.text.trim()) || NO.test(m.text.trim()))) {
+            const ok = YES.test(m.text.trim()); pendingApproval.resolve(ok);
+            await telegram(ok ? "✅ Onaylandı, emir gidiyor." : "⛔ Reddedildi, işlem açılmadı."); log("info", `onay cevabı: ${m.text}`); continue;
+          }
           if (m.text.startsWith("/")) { await telegram(await handle(m.text, ctx)); log("info", `komut: ${m.text}`); }
           else {
             const s = ctx.snapshot();
