@@ -75,8 +75,7 @@ async function main() {
   async function closePosition(id: string, p: Position, why: string) {
     try {
       const px = await getLast(atk, id);
-      const sz = roundSize(p.qty, inst.get(id)?.lotSz ?? 0, 0);
-      await sellMarket(atk, id, String(sz));
+      await sellMarket(atk, id, String(p.qty), inst.get(id)?.lotSz ?? 0);
       const pnl = (px - p.entry) * p.qty - px * p.qty * 0.001;
       st.closed.push({ instId: id, entry: p.entry, exit: px, qty: p.qty, pnl, why, ts: Date.now() });
       st.cooldown[id] = Math.floor(Date.now() / BAR_MS);
@@ -95,7 +94,9 @@ async function main() {
         const o = await getOrder(atk, id, p.ordId, p.px, p.sz);
         if (o.state === "filled" || (o.accFillSz > 0 && (o.state === "canceled" || Date.now() - p.ts > CFG.exit.orderTimeoutSec * 1000))) {
           if (o.state === "live" || o.state === "partially_filled") { try { await cancelOrder(atk, id, p.ordId); } catch { /* */ } }
-          const entry = o.avgPx || p.px; const qty = o.accFillSz || p.sz;
+          const entry = o.avgPx || p.px;
+          const base = id.split("-")[0]!;
+          const qty = (o.accFillSz || p.sz) + (o.feeCcy === base ? o.fee : 0);   // OKX alış komisyonunu coin cinsinden keser (fee negatif)
           st.positions[id] = { instId: id, qty, entry, target: targetPrice(entry, p.target, CFG.exit.targetMinPct), sl: p.sl, openedTs: Date.now(), openedBucket: Math.floor(Date.now() / BAR_MS), reason: p.reason };
           delete st.pending[id];
           log("fill", `${id}: alındı ${qty} @${entry} | hedef ${st.positions[id]!.target.toFixed(6)} | SL ${p.sl} (borsada)`, { reason: p.reason });
