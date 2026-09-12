@@ -1,4 +1,4 @@
-// LLM seçici: kafes içinde karar verir. Boyut, stop, kapı, fren erişimi YOK.
+// LLM seçici: kurallar içinde karar verir. Boyut, stop, BTC filtresi, fren erişimi YOK.
 // Sağlayıcı: claude -p (abonelik) → Gemini API (yedek) → kural (derinliğe göre).
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -18,11 +18,11 @@ function prompt(cands: Candidate[], freeSlots: number, ctx: { btcRetPct: number;
     news_6h_high: c.news.slice(0, 3),
     sentiment_24h: c.sentiment ? `${c.sentiment.label} (${c.sentiment.score})` : null,
   }));
-  return `Sen bir spot kripto trading ajanının SEÇİCİ katmanısın. Cumartesi, OKX TR, long-only, saat ${ctx.tr} (TR).
-Tez: Cumartesi geri dönüş piyasası; stopları avlanmış (dip süpürme + içeri yeşil kapanış) coin alınır, 3 saatlik aralığın ortasına dönünce satılır.
-BTC 4 saatlik getiri: ${ctx.btcRetPct.toFixed(2)}%. Özkaynak: ${ctx.equity.toFixed(2)} USDT. Boş slot: ${freeSlots}.
-Yetkin: adaylar arasından en fazla ${freeSlots} tanesini SEÇMEK ya da hepsini reddetmek. Boyut, stop, kapı ve fren kod tarafındadır, onları tartışma.
-Seçim ölçütleri: (1) haberde delist/hack/exploit/soruşturma varsa KESİN RED; (2) emir defteri alıcı ağır (>1) ise artı; (3) smart money long oranı çok yüksek (>0.9) ve 24h'de artmışsa kalabalık uyarısı, çok düşükse (<0.4) squeeze potansiyeli; (4) göreli güç +2'ye yakınsa kovalama riski; (5) süpürme derinliği ve gün aralığı yüksekse gerçek stop avı olasılığı yüksek.
+  return `Sen bir spot kripto trading ajanının KARAR katmanısın. Cumartesi, OKX TR, long-only, saat ${ctx.tr} (TR).
+Tez: Cumartesi geri dönüş piyasası; stopları avlanmış (dip avı + içeri yeşil kapanış) coin alınır, 3 saatlik aralığın ortasına dönünce satılır.
+BTC 4 saatlik getiri: ${ctx.btcRetPct.toFixed(2)}%. Kasa: ${ctx.equity.toFixed(2)} USDT. Boş slot: ${freeSlots}.
+Yetkin: adaylar arasından en fazla ${freeSlots} tanesini SEÇMEK ya da hepsini reddetmek. Boyut, stop, BTC filtresi ve fren kod tarafındadır, onları tartışma.
+Seçim ölçütleri: (1) haberde delist/hack/exploit/soruşturma varsa KESİN RED; (2) emir defteri alıcı ağır (>1) ise artı; (3) smart money long oranı çok yüksek (>0.9) ve 24h'de artmışsa kalabalık uyarısı, çok düşükse (<0.4) squeeze potansiyeli; (4) göreli güç +2'ye yakınsa kovalama riski; (5) dip avı derinliği ve gün aralığı yüksekse gerçek stop avı olasılığı yüksek.
 Kısa, Türkçe, somut gerekçe yaz. SADECE şu JSON'u döndür, başka metin yok:
 {"picks":[{"instId":"...","reason":"..."}],"rejects":[{"instId":"...","reason":"..."}],"note":"tek cümle rejim yorumu"}
 ADAYLAR:
@@ -97,9 +97,9 @@ export async function decide(cands: Candidate[], freeSlots: number, ctx: { btcRe
   return byRule(cands, freeSlots, "tüm sağlayıcılar düştü");
 }
 
-/** Serbest soru: sahibi Telegram'dan sorar, Seçici günlük bağlamıyla kısa Türkçe cevap verir. */
+/** Serbest soru: sahibi Telegram'dan sorar, Karar günlük bağlamıyla kısa Türkçe cevap verir. */
 export async function ask(question: string, context: string): Promise<string> {
-  const p = `Sen "okx-agent" adlı spot trading ajanının Seçici katmanısın. Sahibin Telegram'dan soru soruyor. Aşağıdaki durum ve günlük bağlamına dayanarak, en fazla 6 cümle, Türkçe, somut ve dürüst cevap ver. Bilmediğini uydurma; günlükte yoksa "günlükte yok" de. Boyut/stop/kapı/fren kuralları koddadır, onları değiştiremezsin; sorulursa bunu söyle.
+  const p = `Sen "okx-agent" adlı spot trading ajanının Karar katmanısın. Sahibin Telegram'dan soru soruyor. Aşağıdaki durum ve günlük bağlamına dayanarak, en fazla 6 cümle, Türkçe, somut ve dürüst cevap ver. Bilmediğini uydurma; günlükte yoksa "günlükte yok" de. Boyut/stop/BTC filtresi/fren kuralları koddadır, onları değiştiremezsin; sorulursa bunu söyle.
 ${context}
 
 SORU: ${question}`;

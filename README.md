@@ -13,11 +13,11 @@ Perakende kripto otomasyonunun iki başarısız ucu var. Kural botları hızlı 
 
 ## 2. Ürün
 
-okx-agent üçüncü bir yol kurar: **LLM karar verir, kafes koddur.**
+okx-agent üçüncü bir yol kurar: **LLM karar verir, kurallar koddur.**
 
-- **Ne yapar:** OKX TR spot piyasasında likit 50 pariteyi 15 dakikada bir tarar, stopları avlanmış coini alır, aralığın ortasına dönünce satar, BTC bozulunca nakitte bekler, 19:15'te zorunlu nakde geçer.
+- **Ne yapar:** OKX TR spot piyasasında likit 80 pariteyi 15 dakikada bir tarar, stopları avlanmış coini alır, aralığın ortasına dönünce satar, BTC bozulunca nakitte bekler, 19:15'te zorunlu nakde geçer.
 - **LLM'in yetkisi:** aday listesinden seçmek ya da hepsini reddetmek, gerekçesiyle. Haber vetosu. Sahibinin sorularına günlükten cevap.
-- **LLM'in yetkisi olmayan:** pozisyon boyutu, stop mesafesi, BTC kapısı, günlük fren, işlem sayısı. Bunlar config dosyasında sabittir ve prompt'ta görünmez.
+- **LLM'in yetkisi olmayan:** pozisyon boyutu, stop mesafesi, BTC filtresi, günlük fren, işlem sayısı. Bunlar config dosyasında sabittir ve prompt'ta görünmez.
 - **Kime değer:** otomasyon isteyen ama sermayesini bir dil modeline teslim etmek istemeyen herkes. Ajanın çıktısı işlem değil, **gerekçeli karar akışı**; işlem onun yan ürünüdür.
 
 ## 3. Kanıt
@@ -29,43 +29,43 @@ Strateji tahmin değil, ölçüm. Etkinlik öncesi OKX TR'nin 15 dakikalık veri
 | 16 giriş sinyali (RSI, EMA, Bollinger, VWAP, hacim, kırılım, geri test, funding…) | Hiçbiri 1-2 saatlik ufukta komisyonu güvenilir şekilde yenmedi |
 | Kırılım kovalama, hacimli 15 dk mum | Cumartesi başabaş, hafta içi işlem başına −%0,16 |
 | Göreli güç kovalama, en güçlü 3 coini tut | Cumartesi günde ortalama −%1,36 |
-| Dip süpürme + içeri kapanış, aralık ortası hedef | İşlem başına +%0,26, işlemlerin %70'i pozitif |
+| Dip avı + içeri kapanış, aralık ortası hedef | İşlem başına +%0,26, işlemlerin %70'i pozitif |
 | Gün sonucu ↔ BTC'nin günü | Korelasyon 0,43; BTC yeşilken +%0,81, kırmızıyken −%0,43 |
 | Tam risk motoruyla gün simülasyonu | 25 Cumartesi'nin 15'i pozitif, en kötü gün −%0,34, ortalama max DD −%0,24 |
 
-Çıkarım: hafta sonu spotta kenar sinyalde değil, seçicilikte ve BTC kapısında. Ajan bu ölçümün ürünüdür.
+Çıkarım: hafta sonu spotta kenar sinyalde değil, seçicilikte ve BTC filtresinda. Ajan bu ölçümün ürünüdür.
 
 ## 4. Mimari
 
 Beş rol, iki ritim. Her günlük satırı hangi rolün konuştuğunu söyler.
 
 ```
- 60 s ┐  İcracı   pozisyonları yönet: hedef → sat · 19:15 → hepsini sat · fren → hepsini sat, dur
-      │  Hakem    stop takibi · gün freni · özkaynak ölçümü
-15 dk ┤  Gözcü    BTC kapısı → evren (≤50 likit USDT paritesi) → süpürme adayları
-      │  Seçici   emir defteri · smart money · duygu skoru · haber → gerekçeli seç / reddet   [LLM]
-      │  Hakem    boyut · tavanlar · fren                                                     [kod]
-      │  İcracı   limit alış + borsada ekli stop
-      └  Kâtip    JSONL · Markdown · Telegram · X Layer denetim izi
+ 60 s ┐  Emir   pozisyonları yönet: hedef → sat · 19:15 → hepsini sat · fren → hepsini sat, dur
+      │  Risk    stop takibi · gün freni · kasa ölçümü
+15 dk ┤  Tarayıcı    BTC filtresi → izleme listesi (≤80 likit USDT paritesi) → dip avı adayları
+      │  Karar   emir defteri · smart money · duygu skoru · haber → gerekçeli seç / reddet   [LLM]
+      │  Risk    boyut · tavanlar · fren                                                     [kod]
+      │  Emir   limit alış + borsada ekli stop
+      └  Günlük    JSONL · Markdown · Telegram · X Layer denetim izi
 ```
 
 | Rol | Modül | Sorumluluk |
 |---|---|---|
-| Gözcü | `market.ts`, `signals.ts` | Evren, mumlar, BTC kapısı, süpürme tespiti, göreli güç, defter dengesi |
-| Seçici | `llm.ts` | Adayları zenginleştirilmiş bağlamla gerekçelendirir; `claude -p` → Gemini → kural motoru |
-| Hakem | `risk.ts` | Pozisyon boyutu, tavanlar, günlük fren, lot ve fiyat yuvarlama. Saf fonksiyonlar, birim testli |
-| İcracı | `exchange.ts` | Limit alış + ekli stop, zaman aşımı iptali, hedefte satış, algo iptali. `--dry-run` hiç emir göndermez |
-| Kâtip | `journal.ts`, `anchor.ts`, `report.ts` | Karar günlüğü, Telegram, X Layer, gün sonu raporu |
+| Tarayıcı | `market.ts`, `signals.ts` | İzleme listesi, mumlar, BTC filtresi, dip avı tespiti, göreli güç, defter dengesi |
+| Karar | `llm.ts` | Adayları zenginleştirilmiş bağlamla gerekçelendirir; `claude -p` → Gemini → kural motoru |
+| Risk | `risk.ts` | Pozisyon boyutu, tavanlar, günlük fren, lot ve fiyat yuvarlama. Saf fonksiyonlar, birim testli |
+| Emir | `exchange.ts` | Limit alış + ekli stop, zaman aşımı iptali, hedefte satış, algo iptali. `--dry-run` hiç emir göndermez |
+| Günlük | `journal.ts`, `anchor.ts`, `report.ts` | Karar günlüğü, Telegram, X Layer, gün sonu raporu |
 | Döngü | `agent.ts` | İki ritim, durum yönetimi, yeniden başlatmada borsayla uzlaştırma |
 | Arayüz | `commands.ts`, `dashboard.ts` | Telegram komutları ve serbest soru; canlı panel |
 
-## 5. Risk kafesi
+## 5. Risk kuralları
 
 | Kural | Değer | Uygulayan |
 |---|---|---|
-| BTC kapısı | 4 saatlik getiri < −%1 → yeni giriş yok | kod |
+| BTC filtresi | 4 saatlik getiri < −%1 → yeni giriş yok | kod |
 | Giriş | son 15 dk mumu 3 saatlik dibi ≥ %0,3 delmiş, üstüne yeşil kapanmış; göreli güç ≤ +%2; cooldown 2 saat | kod |
-| Boyut | min(özkaynak × %0,5 / %4, özkaynak × %12,5) | kod |
+| Boyut | min(kasa × %0,5 / %4, kasa × %12,5) | kod |
 | Sınırlar | aynı anda ≤ 3 pozisyon · günde ≤ 10 işlem · gün −%2 → fren | kod |
 | Stop | %4 altta, emre ekli, **borsa tarafında**; ajan çökse de çalışır | borsa |
 | Çıkış | 3 saatlik aralığın ortası (≥ giriş + %0,3) · 19:15 zorunlu nakit | kod |
@@ -78,9 +78,9 @@ Emir ve hesap işlemleri yalnızca ATK MCP sunucusu üzerinden gider (`okx-trade
 
 | Modül | Araçlar | Kullanım |
 |---|---|---|
-| market | `get_tickers` `get_instruments` `get_candles` `get_ticker` `get_orderbook` | Evren, lot kuralları, 15 dk mumlar, son fiyat, ±%1 defter dengesi |
+| market | `get_tickers` `get_instruments` `get_candles` `get_ticker` `get_orderbook` | İzleme listesi, lot kuralları, 15 dk mumlar, son fiyat, ±%1 defter dengesi |
 | spot | `place_order` (ekli SL) `get_order` `cancel_order` `get_algo_orders` `cancel_algo_order` `get_fills` | Giriş, takip, iptal, stop yönetimi, gerçekleşen işlemler |
-| account | `get_balance` | Özkaynak, kullanılabilir ve dondurulmuş bakiye |
+| account | `get_balance` | Kasa, kullanılabilir ve dondurulmuş bakiye |
 | news | `get_by_coin` `get_coin_sentiment` `get_latest` | Haber vetosu, duygu skoru, saat başı piyasa notu |
 | smartmoney | `get_signal_overview_by_filter` | Lider trader long oranı, kalabalık uyarısı |
 
@@ -98,15 +98,15 @@ Panel her aracın çağrı sayısını canlı gösterir. Ajan Claude Code'a da M
 ## 8. Etkileşim
 
 **Telegram** (yalnız sahibinin sohbeti):
-`/durum` · `/pozisyon` anlık kâr/zarar · `/adaylar` son tarama ve Seçici'nin gerekçeleri · `/neden COIN` · `/kurallar` · `/rapor` · `/dur` · `/devam` · `/zincir`.
-`/mod onaylı` insan-döngüde çalışır: her girişten önce ajan Telegram'dan onay ister, 60 saniyede "evet" gelmezse işlem açılmaz; `/mod otonom` kafes içinde kendi kararıyla döner.
-Komut olmayan her mesaj Seçici'ye sorudur: "sabahtan beri neden işlem açmadın" gibi. Cevap günlük bağlamından gelir, uydurma yoktur.
+`/durum` · `/pozisyon` anlık kâr/zarar · `/adaylar` son tarama ve Karar'nin gerekçeleri · `/neden COIN` · `/kurallar` · `/rapor` · `/dur` · `/devam` · `/zincir`.
+`/mod onaylı` insan-döngüde çalışır: her girişten önce ajan Telegram'dan onay ister, 60 saniyede "evet" gelmezse işlem açılmaz; `/mod otonom` kurallar içinde kendi kararıyla döner.
+Komut olmayan her mesaj Karar'ye sorudur: "sabahtan beri neden işlem açmadın" gibi. Cevap günlük bağlamından gelir, uydurma yoktur.
 
-**Gölge bot:** aynı veride kırılım kovalayan naif strateji (hacimli 15 dk kırılım, TP +%2 / SL −%1 / 2 saat) emir göndermeden paralel simüle edilir. Panel ve `/durum` "kovalayan bot bugün: x%, ben: y%" karşılaştırmasını canlı gösterir; disiplinin değeri ölçülür, iddia edilmez.
+**Kovalayan bot:** aynı veride kırılım kovalayan naif strateji (hacimli 15 dk kırılım, TP +%2 / SL −%1 / 2 saat) emir göndermeden paralel simüle edilir. Panel ve `/durum` "kovalayan bot bugün: x%, ben: y%" karşılaştırmasını canlı gösterir; disiplinin değeri ölçülür, iddia edilmez.
 
 **Doğrulama:** `bun run verify [seq]` batch dosyasını yeniden hash'ler, X Layer'daki işlem verisiyle karşılaştırır ve "EŞLEŞTİ / EŞLEŞMEDİ" der.
 
-**Panel** (`bun run dashboard`, http://localhost:8787): özkaynak ve gün içi eğri, kapı durumu, sayaçlar, risk kafesi, rol etiketli karar akışı, Seçici'nin son kararı, pozisyonlar, kapanan işlemler, MCP araç defteri, X Layer kayıtları. 4 saniyede bir yenilenir.
+**Panel** (`bun run dashboard`, http://localhost:8787): kasa ve gün içi eğri, BTC filtresi durumu, sayaçlar, risk kuralları, rol etiketli karar akışı, Karar'nin son kararı, pozisyonlar, kapanan işlemler, MCP araç defteri, X Layer kayıtları. 4 saniyede bir yenilenir.
 
 ## 9. Denetim izi
 
@@ -131,8 +131,8 @@ Gereksinimler: Bun ≥ 1.3, Node ≥ 18 (ATK için), `@okx_ai/okx-trade-mcp` ve 
 
 - 26 haftalık kanıt, hafta sonu spot rejimine özgüdür; hafta içi aynı sinyal negatiftir. Ajan gün tipini bilir, kural setini buna göre taşımaz.
 - Sermaye 30 USDT; boyutlama yüzdeyle çalışır, büyüdükçe aynı kurallar geçerlidir.
-- 19:15'te Seçici günün post-mortem'ini yazar (kaç tarama, kaç aday, neden girildi/girilmedi, kafes ne zaman devreye girdi, yarına tek ders).
-- Sırada: OKX Global ve Bitget adaptörleri (aynı sinyal ve kafes, farklı emir katmanı), çoklu gün istatistiği, onaylı modda panelden onay.
+- 19:15'te Karar günün post-mortem'ini yazar (kaç tarama, kaç aday, neden girildi/girilmedi, kurallar ne zaman devreye girdi, yarına tek ders).
+- Sırada: OKX Global ve Bitget adaptörleri (aynı sinyal ve kurallar, farklı emir katmanı), çoklu gün istatistiği, onaylı modda panelden onay.
 
 ## 12. Dizin
 

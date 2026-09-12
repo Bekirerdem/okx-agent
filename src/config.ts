@@ -1,4 +1,4 @@
-// Tüm ayarlar tek yerde. Risk kafesi buradaki sayılardır; LLM bunlara erişemez.
+// Tüm ayarlar tek yerde. Risk kuralları buradaki sayılardır; LLM bunlara erişemez.
 export const CFG = {
   profile: process.env.OKX_PROFILE ?? "live",
   modules: "market,spot,account,news,smartmoney",
@@ -8,8 +8,8 @@ export const CFG = {
   session: { start: "09:00", flat: "19:15", end: "19:30" },
   universe: {
     quote: "USDT",
-    minVolUsd: 3_000_000,
-    max: 50,
+    minVolUsd: 1_000_000,
+    max: 80,
     exclude: ["USDC", "USDG", "DAI", "XAUT", "PAXG", "TUSD", "FDUSD", "USDE", "EUR", "USDT", "BTC"],
     refreshMin: 60,
   },

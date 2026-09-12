@@ -8,8 +8,8 @@ export type Entry = { ts: string; kind: Kind; role: string; msg: string; data?: 
 
 // Roller: jüri her satırda hangi ajanın konuştuğunu görür.
 export const ROLE: Record<Kind, string> = {
-  boot: "Kâtip", gate: "Gözcü", scan: "Gözcü", reject: "Hakem", llm: "Seçici", entry: "İcracı", fill: "İcracı", cancel: "İcracı",
-  exit: "İcracı", stop: "Hakem", halt: "Hakem", flat: "İcracı", error: "Kâtip", snapshot: "Kâtip", info: "Kâtip",
+  boot: "Günlük", gate: "Tarayıcı", scan: "Tarayıcı", reject: "Risk", llm: "Karar", entry: "Emir", fill: "Emir", cancel: "Emir",
+  exit: "Emir", stop: "Risk", halt: "Risk", flat: "Emir", error: "Günlük", snapshot: "Günlük", info: "Günlük",
 };
 const ICON: Record<Kind, string> = {
   boot: "🟢", gate: "🚧", scan: "🔍", reject: "⛔", llm: "🧠", entry: "🟩", fill: "✅", cancel: "↩️", exit: "🎯",

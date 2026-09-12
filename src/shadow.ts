@@ -1,4 +1,4 @@
-// Gölge bot: "kırılım kovalayan" naif strateji, emir göndermeden paralel simüle edilir.
+// Kovalayan bot: "kırılım kovalayan" naif strateji, emir göndermeden paralel simüle edilir.
 // Amaç: disiplinin değerini canlı kanıtlamak. Kural: hacimli 15 dk kırılım (kapanış > önceki 24 mum tepesi,
 // hacim > 1.5× ort) → kapanışta al, TP +2 / SL −1 / 2 saat zaman stopu, komisyon %0,2. Pozisyon = özkaynağın %12,5'i.
 import type { Bar } from "./signals";
@@ -57,5 +57,5 @@ export function flattenShadow(s: ShadowState, lastPx: Record<string, number>, no
 
 export function shadowSummary(s: ShadowState, dayStart: number): string {
   const pct = dayStart ? (s.pnlUsdt / dayStart) * 100 : 0;
-  return `kovalayan gölge bot: ${s.trades} işlem, ${s.wins} kazanan, açık ${Object.keys(s.open).length}, PnL ${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`;
+  return `kovalayan bot: ${s.trades} işlem, ${s.wins} kazanan, açık ${Object.keys(s.open).length}, PnL ${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`;
 }

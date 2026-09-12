@@ -5,7 +5,7 @@ import type { Bar } from "../src/signals";
 const mk = (o: number, h: number, l: number, c: number, v = 1, i = 0): Bar => ({ ts: i, o, h, l, c, v });
 const base = Array.from({ length: 24 }, (_, i) => mk(100, 101, 99, 100, 1, i));
 
-describe("gölge bot", () => {
+describe("kovalayan bot", () => {
   test("hacimli kırılım → sinyal", () => {
     expect(detectBreakout([...base, mk(100, 102, 100, 101.5, 3, 24)])).toBe(true);
   });

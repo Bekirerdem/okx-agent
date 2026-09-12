@@ -11,7 +11,7 @@
      PALETTE  kağıt #f5f2ea 86% · mürekkep #14171c 10% · gri #5b6270 · tek vurgu amber #c2410c ≤ 3% · artı #15803d · eksi #b91c1c · çizgi #d9d3c4
      TYPE     sayılar JetBrains Mono 800 · gövde Instrument Sans 17px · etiket mono 12px büyük harf .14em · en küçük metin 14px
      LAYOUT   RAIL 380 | AKIŞ | YAN 400 · başlık 68px · bölüm ritmi 32px · satır 12px/16px
-     THE MOVE özkaynak sayısı 84px, rail'den taşar
+     THE MOVE kasa sayısı 84px, rail'den taşar
      REFUSALS gradient yok · gölge yok · kart yok · ikon yok · ortalanmış hiçbir şey yok · renkli sol kenar yok */
   :root { --bg:#f5f2ea; --ink:#14171c; --muted:#5b6270; --acc:#c2410c; --up:#15803d; --dn:#b91c1c; --line:#d9d3c4; --soft:#ece8dd; }
   * { box-sizing:border-box; margin:0; padding:0; }
@@ -72,7 +72,7 @@
   .row { display:grid; grid-template-columns:76px 96px minmax(0,1fr); gap:0 18px; padding:14px 0; border-bottom:1px solid var(--line); }
   .row .t { font-family:"JetBrains Mono"; font-size:15px; color:var(--muted); padding-top:2px; }
   .row .r { font-family:"JetBrains Mono"; font-size:12px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; padding-top:4px; color:var(--muted); }
-  .row .r.Seçici { color:var(--acc); } .row .r.Hakem { color:var(--dn); } .row .r.İcracı { color:var(--up); } .row .r.Gözcü { color:var(--ink); }
+  .row .r.Karar { color:var(--acc); } .row .r.Risk { color:var(--dn); } .row .r.Emir { color:var(--up); } .row .r.Tarayıcı { color:var(--ink); }
   .row .m { font-size:17px; word-break:break-word; }
   .row .m .d { display:block; color:var(--muted); font-size:15px; margin-top:6px; white-space:pre-wrap; }
   .row.kind-entry .m, .row.kind-fill .m, .row.kind-exit .m { color:var(--up); font-weight:600; }
@@ -103,22 +103,22 @@
   </header>
 
   <aside class="rail">
-    <div class="label">Özkaynak</div>
+    <div class="label">Kasa</div>
     <div class="equity" id="eq">—<small>USDT</small></div>
     <div class="delta" id="delta"></div>
     <svg id="spark" viewBox="0 0 300 72" preserveAspectRatio="none"></svg>
 
-    <div class="label">Kapı</div>
+    <div class="label">BTC filtresi</div>
     <div class="gate" id="gate">henüz tarama yok</div>
 
     <div class="label">Kovalayan bot ile karşılaştırma</div>
-    <div class="duel" id="shadow"><div><div class="n">—</div><div class="k">kovalayan gölge bot</div></div><div><div class="n">—</div><div class="k">ben</div></div></div>
+    <div class="duel" id="shadow"><div><div class="n">—</div><div class="k">kovalayan bot</div></div><div><div class="n">—</div><div class="k">ben</div></div></div>
     <div class="cage" id="shadowsub" style="margin-top:10px"></div>
 
     <div class="label">Sayaçlar</div>
     <div class="kv" id="kv"></div>
 
-    <div class="label">Risk kafesi · kod, LLM erişemez</div>
+    <div class="label">Risk kuralları · kod, LLM erişemez</div>
     <div class="cage">işlem başı risk <b>%0,5</b> · stop <b>%4</b> borsada<br>pozisyon tavanı <b>%12,5</b> · aynı anda <b>≤3</b><br>günde <b>≤10</b> işlem · gün freni <b>−%2</b><br>BTC 4h &lt; <b>−%1</b> → giriş yok · <b>19:15</b> nakit</div>
 
     <div class="label">ATK MCP araç defteri</div>
@@ -129,20 +129,20 @@
   </aside>
 
   <main class="main">
-    <div class="label">Seçici'ye sor · günlük bağlamıyla cevaplar</div>
+    <div class="label">Karar'ye sor · günlük bağlamıyla cevaplar</div>
     <form id="askf" class="askf" autocomplete="off">
       <input id="askq" type="text" placeholder="örn. sabahtan beri neden işlem açmadın? şu an en riskli ne?" maxlength="300">
       <button type="submit" id="askb">sor</button>
     </form>
     <div class="answer" id="answer" hidden></div>
 
-    <div class="label">Seçici'nin son kararı</div>
+    <div class="label">Karar'nin son kararı</div>
     <div class="llm" id="llm"><span class="empty">henüz aday oluşmadı</span></div>
 
-    <div class="label">Son adaylar · Gözcü'nün Seçici'ye verdiği bağlam</div>
+    <div class="label">Son adaylar · Tarayıcı'nün Karar'ye verdiği bağlam</div>
     <div id="cands"><span class="empty">henüz aday yok</span></div>
 
-    <div class="label">Karar akışı · Gözcü / Seçici / Hakem / İcracı / Kâtip</div>
+    <div class="label">Karar akışı · Tarayıcı / Karar / Risk / Emir / Günlük</div>
     <div class="stream" id="stream"></div>
   </main>
 
@@ -182,7 +182,7 @@ async function refresh() {
   if (st) {
     $("eq").innerHTML = `${fmt(st.equity)}<small>USDT</small>`;
     $("delta").innerHTML = `<span class="${cls(me)}">${sign(me)}</span><span class="gs">gün başı ${fmt(st.dayStartEquity)}</span>${st.halted ? ' <span class="dn">· FREN</span>' : ""}`;
-    $("kv").innerHTML = [["açık pozisyon", Object.keys(st.positions).length], ["bekleyen emir", Object.keys(st.pending).length], ["işlem / gün", `${st.tradesToday} / 10`], ["tarama", d.counts.scan], ["kapı kapalı", d.counts.gate], ["Seçici kararı", d.counts.llm], ["ret", d.counts.reject], ["hata", d.counts.error]].map(([k, v]) => `<div>${k}</div><div>${v}</div>`).join("");
+    $("kv").innerHTML = [["açık pozisyon", Object.keys(st.positions).length], ["bekleyen emir", Object.keys(st.pending).length], ["işlem / gün", `${st.tradesToday} / 10`], ["tarama", d.counts.scan], ["filtre kapalı", d.counts.gate], ["Karar kararı", d.counts.llm], ["ret", d.counts.reject], ["hata", d.counts.error]].map(([k, v]) => `<div>${k}</div><div>${v}</div>`).join("");
     const pos = Object.values(st.positions);
     $("positions").innerHTML = pos.length ? pos.map((p) => `<div class="pos"><b>${p.instId}</b><div class="n">${p.qty} @ ${p.entry}</div><div class="n">hedef ${p.target} · SL ${p.sl}</div><div class="sub">${esc(p.reason)}</div></div>`).join("") : '<span class="empty">nakitteyim</span>';
     const pen = Object.values(st.pending);
@@ -197,10 +197,10 @@ async function refresh() {
     $("scan").textContent = m.lastScan || "—";
     $("llm").innerHTML = m.lastLlm ? `<div class="h">${esc(m.lastLlm.split("\n")[0])}</div>${esc(m.lastLlm.split("\n").slice(1).join("\n")) || '<span class="empty">seçim yok</span>'}` : '<span class="empty">henüz aday oluşmadı</span>';
     const cc = m.lastCands || [];
-    $("cands").innerHTML = cc.length ? `<table class="cands"><tr><th>parite</th><th>süpürme</th><th>gün aralığı</th><th>RS 4h</th><th>defter b/a</th><th>smart long</th><th>duygu</th><th>haber 6s</th><th>saat</th></tr>${cc.map((c) => `<tr><td>${c.instId}</td><td>${fmt(c.depth)}%</td><td>${fmt(c.range)}%</td><td class="${c.rs4h > 2 ? "dn" : ""}">${c.rs4h > 0 ? "+" : ""}${fmt(c.rs4h)}%</td><td class="${c.book > 1 ? "up" : "dn"}">${fmt(c.book)}</td><td>${c.smart === null ? "—" : fmt(c.smart)}</td><td>${esc((c.sentiment || "—").split(" (")[0])}</td><td>${c.news}</td><td>${c.hm}</td></tr>`).join("")}</table>` : '<span class="empty">henüz aday yok</span>';
+    $("cands").innerHTML = cc.length ? `<table class="cands"><tr><th>parite</th><th>dip avı</th><th>gün aralığı</th><th>RS 4h</th><th>defter b/a</th><th>smart long</th><th>duygu</th><th>haber 6s</th><th>saat</th></tr>${cc.map((c) => `<tr><td>${c.instId}</td><td>${fmt(c.depth)}%</td><td>${fmt(c.range)}%</td><td class="${c.rs4h > 2 ? "dn" : ""}">${c.rs4h > 0 ? "+" : ""}${fmt(c.rs4h)}%</td><td class="${c.book > 1 ? "up" : "dn"}">${fmt(c.book)}</td><td>${c.smart === null ? "—" : fmt(c.smart)}</td><td>${esc((c.sentiment || "—").split(" (")[0])}</td><td>${c.news}</td><td>${c.hm}</td></tr>`).join("")}</table>` : '<span class="empty">henüz aday yok</span>';
     if (m.shadow) {
       const sh = m.shadow;
-      $("shadow").innerHTML = `<div><div class="n ${cls(sh.pnlPct)}">${sign(sh.pnlPct)}</div><div class="k">kovalayan gölge bot · <b>${sh.trades}</b> işlem</div></div><div><div class="n ${cls(me)}">${sign(me)}</div><div class="k">ben · <b>${st ? st.closed.length : 0}</b> işlem</div></div>`;
+      $("shadow").innerHTML = `<div><div class="n ${cls(sh.pnlPct)}">${sign(sh.pnlPct)}</div><div class="k">kovalayan bot · <b>${sh.trades}</b> işlem</div></div><div><div class="n ${cls(me)}">${sign(me)}</div><div class="k">ben · <b>${st ? st.closed.length : 0}</b> işlem</div></div>`;
       $("shadowsub").textContent = sh.trades ? `Aynı veride kırılım kovalayan naif bot: ${sh.wins} kazanan, ${(sh.open || []).length} açık. Emir göndermez, sadece simüle eder.` : "Kırılım kovalayan naif bot aynı veriyi izliyor; henüz sinyal üretmedi.";
     }
     const tools = Object.entries(m.byTool || {}).sort((a, b) => b[1] - a[1]).slice(0, 7); const mx = tools[0]?.[1] || 1;
@@ -215,7 +215,7 @@ $("askf").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const q = $("askq").value.trim(); if (!q) return;
   $("askq").value = ""; $("askq").focus();
-  $("askb").disabled = true; $("answer").hidden = false; $("answer").innerHTML = `<div class="q">${esc(q)}</div><span class="empty">Seçici düşünüyor…</span>`;
+  $("askb").disabled = true; $("answer").hidden = false; $("answer").innerHTML = `<div class="q">${esc(q)}</div><span class="empty">Karar düşünüyor…</span>`;
   try {
     const r = await (await fetch("/api/ask", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ q }) })).json();
     $("answer").innerHTML = `<div class="q">${esc(q)}</div>${esc(r.answer || r.error || "cevap yok")}`;

@@ -1,4 +1,4 @@
-// Ana döngü. Her 60 s tick: pozisyon yönetimi. Her 15 dk mum kapanışı: kapı → tarama → LLM seçici → risk → emir.
+// Ana döngü. Her 60 s tick: pozisyon yönetimi. Her 15 dk mum kapanışı: BTC filtresi → tarama → LLM seçici → risk → emir.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { CFG } from "./config";
 import { Atk } from "./mcp";
@@ -66,7 +66,7 @@ async function main() {
     if (have < p.qty * 0.5) { log("stop", `${id}: bakiye yok, pozisyon borsada kapanmış (SL?)`, { qty: p.qty, have }); delete st.positions[id]; }
   }
   saveState(st);
-  log("boot", `ajan ayakta | ${CFG.dryRun ? "DRY-RUN" : "CANLI"} | özkaynak ${st.equity.toFixed(2)} USDT | evren ${universe.length} parite | LLM ${CFG.llm.provider}`,
+  log("boot", `ajan ayakta | ${CFG.dryRun ? "DRY-RUN" : "CANLI"} | kasa ${st.equity.toFixed(2)} USDT | izleme listesi ${universe.length} parite | LLM ${CFG.llm.provider}`,
     { dayStartEquity: st.dayStartEquity, positions: Object.keys(st.positions), risk: CFG.risk, anchor: anchorStatus(), anchorAddress: anchorAddress() });
 
   async function flattenAll(why: string) {
@@ -93,7 +93,7 @@ async function main() {
     const { hm, minutes } = trNow();
     try {
       const b = await getBalance(atk); st.equity = b.totalEq;
-      if (!st.dayStartEquity && b.totalEq > 0) { st.dayStartEquity = b.totalEq; log("info", `gün başı özkaynak belirlendi: ${b.totalEq.toFixed(2)} USDT`); }
+      if (!st.dayStartEquity && b.totalEq > 0) { st.dayStartEquity = b.totalEq; log("info", `gün başı kasa belirlendi: ${b.totalEq.toFixed(2)} USDT`); }
       // bekleyen emirler
       for (const [id, p] of Object.entries(st.pending)) {
         const o = await getOrder(atk, id, p.ordId, p.px, p.sz);
@@ -135,14 +135,14 @@ async function main() {
           st.postmortem = true; saveState(st);
           try {
             const journal = existsSync(CFG.paths.journal) ? readFileSync(CFG.paths.journal, "utf-8").trim().split(String.fromCharCode(10)).slice(-200).map((l) => { try { const e = JSON.parse(l); return `${e.ts.slice(11, 16)}Z ${e.role}·${e.kind}: ${e.msg}${e.data?.reason ? " → " + e.data.reason : ""}`; } catch { return ""; } }).join(String.fromCharCode(10)) : "";
-            const text = await ask("Günün post-mortem'ini yaz: ne oldu, kaç tarama, kaç aday, neden girdin/girmedin, risk kafesi ne zaman devreye girdi, yarın için tek ders. En fazla 10 cümle.", `GÜN: ${st.day} · başlangıç ${st.dayStartEquity.toFixed(2)} → bitiş ${st.equity.toFixed(2)} USDT · kapanan işlem ${st.closed.length}
+            const text = await ask("Günün post-mortem'ini yaz: ne oldu, kaç tarama, kaç aday, neden girdin/girmedin, risk kuralları ne zaman devreye girdi, yarın için tek ders. En fazla 10 cümle.", `GÜN: ${st.day} · başlangıç ${st.dayStartEquity.toFixed(2)} → bitiş ${st.equity.toFixed(2)} USDT · kapanan işlem ${st.closed.length}
 ${journal}`);
-            log("info", `GÜN SONU ANLATISI (Seçici): ${text}`);
+            log("info", `GÜN SONU ANLATISI (Karar): ${text}`);
           } catch (e) { log("error", `post-mortem: ${(e as Error).message?.slice(0, 120)}`); }
         }
       } else if (!st.halted && dailyStopHit(st.equity, st.dayStartEquity, CFG.risk)) {
         st.halted = true; await flattenAll("gün freni");
-        log("halt", `GÜN FRENİ: özkaynak ${st.equity.toFixed(2)} (${((st.equity / st.dayStartEquity - 1) * 100).toFixed(2)}%). Bugün yeni işlem yok.`);
+        log("halt", `GÜN FRENİ: kasa ${st.equity.toFixed(2)} (${((st.equity / st.dayStartEquity - 1) * 100).toFixed(2)}%). Bugün yeni işlem yok.`);
       }
       // mum kapanışı
       const bucket = Math.floor(Date.now() / BAR_MS);
@@ -151,7 +151,7 @@ ${journal}`);
         if (minutes >= toMin(CFG.session.start) && minutes < toMin(CFG.session.flat)) await onBarClose();
         else log("info", `${hm}: seans dışı, sadece izleme`);
       }
-      if (minutes % 15 === 0) log("snapshot", `özkaynak ${st.equity.toFixed(2)} USDT (${((st.equity / st.dayStartEquity - 1) * 100).toFixed(2)}%) | açık ${Object.keys(st.positions).length} | bekleyen ${Object.keys(st.pending).length} | işlem ${st.tradesToday} | MCP çağrı ${atk.calls} hata ${atk.errors} | ${shadowSummary(st.shadow, st.dayStartEquity)}`);
+      if (minutes % 15 === 0) log("snapshot", `kasa ${st.equity.toFixed(2)} USDT (${((st.equity / st.dayStartEquity - 1) * 100).toFixed(2)}%) | açık ${Object.keys(st.positions).length} | bekleyen ${Object.keys(st.pending).length} | işlem ${st.tradesToday} | MCP çağrı ${atk.calls} hata ${atk.errors} | ${shadowSummary(st.shadow, st.dayStartEquity)}`);
       if (minutes % 15 === 0) { const a = await anchorFlush(); if (a) log("info", `X Layer denetim izi: ${a.n} karar → ${a.root.slice(0, 18)}… ${a.url}`); }
     } catch (e) {
       log("error", `tick: ${(e as Error).message?.slice(0, 200)}`);
@@ -164,7 +164,7 @@ ${journal}`);
   async function onBarClose() {
     const { hm } = trNow();
     if (st.halted) { log("info", `${hm}: fren aktif, tarama yok`); return; }
-    if (Date.now() - universeTs > CFG.universe.refreshMin * 60_000) { try { universe = await getUniverse(atk); inst = await getInstruments(atk); universeTs = Date.now(); } catch { /* eski evren */ } }
+    if (Date.now() - universeTs > CFG.universe.refreshMin * 60_000) { try { universe = await getUniverse(atk); inst = await getInstruments(atk); universeTs = Date.now(); } catch { /* eski izleme listesi */ } }
     if (Date.now() - smartTs > 15 * 60_000) { smart = await getSmartMoney(atk); smartTs = Date.now(); }
 
     const btc = await getCandles(atk, "BTC-USDT", 40);
@@ -183,7 +183,7 @@ ${journal}`);
         const t = queue[idx++]!;
         try {
           const bars = await getCandles(atk, t.instId, 40);
-          st.shadow = stepShadow(st.shadow, t.instId, bars, st.equity, Date.now());   // gölge bot: kovalayan naif strateji, emir yok
+          st.shadow = stepShadow(st.shadow, t.instId, bars, st.equity, Date.now());   // kovalayan bot: kovalayan naif strateji, emir yok
           const sweep = detectSweep(bars, CFG.entry.lookback, CFG.entry.minDepthPct);
           if (!sweep) continue;
           const sigTs = bars[bars.length - 1]!.ts;
@@ -198,15 +198,15 @@ ${journal}`);
     }));
     raw.sort((a, b) => b.sweep.depthPct - a.sweep.depthPct);
     last.scan = `${hm}: ${raw.length} aday: ${raw.map((r) => `${r.t.instId} (derinlik ${r.sweep.depthPct.toFixed(2)}%)`).join(", ") || "yok"}`;
-    last.gate = `Kapı ${gate.open ? "AÇIK" : "KAPALI"} — BTC 4h ${gate.retPct.toFixed(2)}% (${hm})`;
-    log("scan", `${hm}: BTC 4h ${gate.retPct.toFixed(2)}% → kapı ${gate.open ? "AÇIK" : "KAPALI"} | ${universe.length} parite tarandı | ${raw.length} süpürme adayı${skipped.length ? " | elenen " + skipped.length : ""}`,
+    last.gate = `BTC filtresi ${gate.open ? "AÇIK" : "KAPALI"} — BTC 4h ${gate.retPct.toFixed(2)}% (${hm})`;
+    log("scan", `${hm}: BTC 4h ${gate.retPct.toFixed(2)}% → BTC filtresi ${gate.open ? "AÇIK" : "KAPALI"} | ${universe.length} parite tarandı | ${raw.length} dip avı adayı${skipped.length ? " | elenen " + skipped.length : ""}`,
       { candidates: raw.map((r) => `${r.t.instId} d${r.sweep.depthPct.toFixed(2)}`), skipped: skipped.slice(0, 12) });
 
     if (hm.endsWith(":00")) {
       const heads = await getImportantNews(atk, 4);
       if (heads.length) log("info", `${hm} piyasa notu (OKX news, yüksek önem): ${heads.map((h) => "• " + h.slice(0, 90)).join(" ")}`);
     }
-    if (!gate.open) { log("gate", `KAPI KAPALI: BTC 4 saatte ${gate.retPct.toFixed(2)}%. ${raw.length} aday reddedildi, nakitte bekliyorum.`, { reason: "BTC düşerken long-only spotta risk bütçesi sıfır" }); return; }
+    if (!gate.open) { log("gate", `BTC FİLTRESİ KAPALI: BTC 4 saatte ${gate.retPct.toFixed(2)}%. ${raw.length} aday reddedildi, nakitte bekliyorum.`, { reason: "BTC düşerken long-only spotta risk bütçesi sıfır" }); return; }
     if (!raw.length) return;
     if (!slots.ok) { log("reject", `${raw.length} aday var ama giriş yok: ${slots.why}`); return; }
     const freeSlots = CFG.risk.maxPositions - Object.keys(st.positions).length - Object.keys(st.pending).length;
@@ -224,7 +224,7 @@ ${journal}`);
 
     last.cands = cands.map((c) => ({ instId: c.instId, close: c.close, depth: +c.depthPct.toFixed(2), mid: c.mid, rs4h: +c.rs4h.toFixed(2), range: +c.dayRangePct.toFixed(2), book: +c.bookImb.toFixed(2), smart: c.smart ? +c.smart.longRatio.toFixed(2) : null, sentiment: c.sentiment?.label ?? null, news: c.news.length, hm }));
     const d = await decide(cands, freeSlots, { btcRetPct: gate.retPct, equity: st.equity, tr: hm });
-    last.llm = [`Seçici (${d.provider}): ${d.note}`, ...d.picks.map((p) => `✅ ${p.instId}: ${p.reason}`), ...d.rejects.map((p) => `⛔ ${p.instId}: ${p.reason}`)].join(String.fromCharCode(10));
+    last.llm = [`Karar (${d.provider}): ${d.note}`, ...d.picks.map((p) => `✅ ${p.instId}: ${p.reason}`), ...d.rejects.map((p) => `⛔ ${p.instId}: ${p.reason}`)].join(String.fromCharCode(10));
     log("llm", `${d.provider}: ${d.picks.length} seçim, ${d.rejects.length} ret. ${d.note}`, {
       picks: d.picks.map((p) => `${p.instId}: ${p.reason}`), rejects: d.rejects.map((p) => `${p.instId}: ${p.reason}`),
     });
@@ -240,7 +240,7 @@ ${journal}`);
       const sl = roundPrice(stopPrice(px, CFG.risk), i.tickSz);
       if (getMode() === "onaylı") {
         log("info", `${c.instId}: onaylı mod, sahibine soruluyor (60 sn)`);
-        const ok = await askApproval(`${c.instId} al?\n${sz} @ ${px} (${(sz * px).toFixed(2)} USDT) · SL ${sl} · hedef ${targetPrice(px, c.mid, CFG.exit.targetMinPct).toFixed(6)}\nSeçici: ${pick.reason}`, 60_000);
+        const ok = await askApproval(`${c.instId} al?\n${sz} @ ${px} (${(sz * px).toFixed(2)} USDT) · SL ${sl} · hedef ${targetPrice(px, c.mid, CFG.exit.targetMinPct).toFixed(6)}\nKarar: ${pick.reason}`, 60_000);
         if (!ok) { log("reject", `${c.instId}: sahibi onaylamadı ya da süre doldu (onaylı mod)`); continue; }
       }
       try {

@@ -12,7 +12,7 @@ function api() {
   const metrics = json("state/metrics.json", null);
   const journal = jsonl("state/journal.jsonl");
   const anchors = jsonl("state/anchors.jsonl");
-  const snaps = journal.filter((e) => e.kind === "snapshot").map((e) => ({ ts: e.ts, eq: Number((e.msg.match(/özkaynak ([\d.]+)/) ?? [])[1]) })).filter((s) => s.eq > 0);
+  const snaps = journal.filter((e) => e.kind === "snapshot").map((e) => ({ ts: e.ts, eq: Number((e.msg.match(/(?:özkaynak|kasa) ([\d.]+)/) ?? [])[1]) })).filter((s) => s.eq > 0);
   return { now: Date.now(), state, metrics, journal: journal.slice(-120).reverse(), anchors: anchors.slice(-8).reverse(), snaps, counts: Object.fromEntries(["scan", "gate", "reject", "llm", "entry", "fill", "cancel", "exit", "stop", "halt", "error"].map((k) => [k, journal.filter((e) => e.kind === k).length])) };
 }
 
@@ -22,8 +22,8 @@ function askContext(): string {
   const st = json("state/state.json", {}); const m = json("state/metrics.json", {});
   const recent = jsonl("state/journal.jsonl").slice(-40).map((e) => `${String(e.ts).slice(11, 19)}Z ${e.role}·${e.kind}: ${e.msg}${e.data?.reason ? " → " + e.data.reason : ""}`).join(String.fromCharCode(10));
   return [
-    `DURUM: özkaynak ${Number(st.equity ?? 0).toFixed(2)} USDT, gün başı ${Number(st.dayStartEquity ?? 0).toFixed(2)}, açık ${Object.keys(st.positions ?? {}).length}, bekleyen ${Object.keys(st.pending ?? {}).length}, işlem ${st.tradesToday ?? 0}, fren ${st.halted ? "aktif" : "yok"}.`,
-    String(m.lastGate ?? ""), `SON TARAMA: ${m.lastScan ?? ""}`, `SEÇİCİ: ${m.lastLlm ?? ""}`, `GÖLGE BOT: ${m.shadow?.summary ?? ""}`, "SON GÜNLÜK:", recent,
+    `DURUM: kasa ${Number(st.equity ?? 0).toFixed(2)} USDT, gün başı ${Number(st.dayStartEquity ?? 0).toFixed(2)}, açık ${Object.keys(st.positions ?? {}).length}, bekleyen ${Object.keys(st.pending ?? {}).length}, işlem ${st.tradesToday ?? 0}, fren ${st.halted ? "aktif" : "yok"}.`,
+    String(m.lastGate ?? ""), `SON TARAMA: ${m.lastScan ?? ""}`, `KARAR: ${m.lastLlm ?? ""}`, `GÖLGE BOT: ${m.shadow?.summary ?? ""}`, "SON GÜNLÜK:", recent,
   ].join(String.fromCharCode(10));
 }
 
