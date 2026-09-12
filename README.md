@@ -15,7 +15,7 @@ Perakende kripto otomasyonunun iki başarısız ucu var. Kural botları hızlı 
 
 okx-agent üçüncü bir yol kurar: **LLM karar verir, kurallar koddur.**
 
-- **Ne yapar:** OKX TR spot piyasasında likit 80 pariteyi 15 dakikada bir tarar, stopları avlanmış coini alır, aralığın ortasına dönünce satar, BTC bozulunca nakitte bekler, 19:15'te zorunlu nakde geçer.
+- **Ne yapar:** OKX TR spot piyasasında likit 80 pariteyi 5 dakikada bir tarar, stopları avlanmış coini alır, aralığın ortasına dönünce satar, BTC bozulunca nakitte bekler, 19:15'te zorunlu nakde geçer.
 - **LLM'in yetkisi:** aday listesinden seçmek ya da hepsini reddetmek, gerekçesiyle. Haber vetosu. Sahibinin sorularına günlükten cevap.
 - **LLM'in yetkisi olmayan:** pozisyon boyutu, stop mesafesi, BTC filtresi, günlük fren, işlem sayısı. Bunlar config dosyasında sabittir ve prompt'ta görünmez.
 - **Kime değer:** otomasyon isteyen ama sermayesini bir dil modeline teslim etmek istemeyen herkes. Ajanın çıktısı işlem değil, **gerekçeli karar akışı**; işlem onun yan ürünüdür.
@@ -68,7 +68,7 @@ Beş rol, iki ritim. Her günlük satırı hangi rolün konuştuğunu söyler.
 | Boyut | min(kasa × %0,5 / %4, kasa × %12,5) | kod |
 | Sınırlar | aynı anda ≤ 3 pozisyon · günde ≤ 10 işlem · gün −%2 → fren | kod |
 | Stop | %4 altta, emre ekli, **borsa tarafında**; ajan çökse de çalışır | borsa |
-| Çıkış | 3 saatlik aralığın ortası (≥ giriş + %0,3) · 19:15 zorunlu nakit | kod |
+| Çıkış | 3 saatlik aralığın ortası, en az giriş + %0,3, en çok + %0,5; hedef ve stop borsada (OCO) · +%0,35 görülünce stop girişin +%0,25 üstüne · 18:50 sonrası yeni giriş yok · 19:15 zorunlu nakit | borsa + kod |
 | Emir | limit, mum kapanış fiyatı; 120 s içinde dolmazsa iptal | kod |
 | Seçim ve veto | aday seçimi, haber vetosu, gerekçe | LLM |
 

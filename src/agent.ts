@@ -172,6 +172,16 @@ async function main() {
             log("info", `${id}: hedef ${p.target.toFixed(4)} ve stop ${p.sl} borsaya OCO olarak taşındı; ajan kör kalsa bile çıkış gerçekleşir`, { tg: `<b>${id}</b> · hedef ve stop artık borsada (OCO)` });
           } catch (e) { log("error", `${id} OCO: ${(e as Error).message?.slice(0, 160)}`); }
         }
+        // hedef tavanı düştüyse açık pozisyonun borsadaki hedefi de tavana çekilir (kural değişikliği eski pozisyona da uygulanır)
+        const cap = p.entry * (1 + CFG.exit.targetMaxPct / 100);
+        if (p.oco && !p.locked && p.target > cap * 1.0005) {
+          try {
+            const i = inst.get(id); const sz = roundSize(have ?? p.qty, i?.lotSz ?? 0, 0); const tp = roundPrice(cap, i?.tickSz ?? 0);
+            await placeOco(atk, id, String(sz), String(tp), String(p.sl));
+            const old = p.target; p.target = tp; saveState(st);
+            log("info", `${id}: hedef tavanı +${CFG.exit.targetMaxPct}% → hedef ${old.toFixed(4)} yerine ${tp}, borsada yenilendi (stop ${p.sl} aynı)`, { tg: `<b>${id}</b> · hedef ${tp}'e çekildi (giriş +${CFG.exit.targetMaxPct}%), borsada · stop ${p.sl}` });
+          } catch (e) { log("error", `${id} hedef güncelleme: ${(e as Error).message?.slice(0, 160)}`); }
+        }
         const px = await getLast(atk, id);
         if (px >= p.target) { await closePosition(id, p, "hedef"); continue; }
         // kâr kilidi: +%1 görüldü → stop girişin üstüne (borsada). Kârdayken zarara dönmek biter.
@@ -230,8 +240,9 @@ ${journal}`);
   }
 
   async function onBarClose() {
-    const { hm } = trNow();
+    const { hm, minutes } = trNow();
     if (st.halted) { log("info", `${hm}: fren aktif, tarama yok`); return; }
+    if (minutes >= toMin(CFG.session.lastEntry)) { log("info", `${hm}: son giriş saati ${CFG.session.lastEntry} geçti, yeni giriş yok; açık pozisyonu 19:15'e kadar izliyorum`); return; }
     if (Date.now() - universeTs > CFG.universe.refreshMin * 60_000) { try { universe = await getUniverse(atk); inst = await getInstruments(atk); universeTs = Date.now(); } catch { /* eski izleme listesi */ } }
     if (Date.now() - smartTs > 15 * 60_000) { smart = await getSmartMoney(atk); smartTs = Date.now(); }
 

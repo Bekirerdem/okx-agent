@@ -155,7 +155,7 @@
     <div class="gate" id="gate">henüz tarama yok</div>
 
     <div class="label">Risk kuralları · kodda, LLM değiştiremez</div>
-    <div class="cage">işlem başına risk <b>%0,5</b>, tek pozisyon en çok <b>%12,5</b><br>stop <b>%4</b> ve hedef borsada (OCO), ajan kör kalsa da çalışır<br>hedef en çok <b>+%1,5</b> · <b>+%1</b> görülünce stop girişe çekilir<br>aynı anda <b>≤3</b> pozisyon · günde <b>≤10</b> işlem<br>gün zararı <b>−%2</b> olursa fren · <b>19:15</b>'te her şey nakit</div>
+    <div class="cage">işlem başına risk <b>%0,5</b>, tek pozisyon en çok <b>%12,5</b><br>stop <b>%4</b> ve hedef borsada (OCO), ajan kör kalsa da çalışır<br>hedef en çok <b>+%0,5</b> · <b>+%0,35</b> görülünce stop girişin üstüne çekilir<br>aynı anda <b>≤3</b> pozisyon · günde <b>≤10</b> işlem<br>gün zararı <b>−%2</b> olursa fren · <b>18:50</b> sonrası giriş yok · <b>19:15</b>'te her şey nakit</div>
 
     <div class="label">Kovalayan bot ile kıyas</div>
     <div class="duel" id="shadow"><div><div class="n">—</div><div class="k">kovalayan bot</div></div><div><div class="n">—</div><div class="k">ben</div></div></div>
@@ -207,9 +207,9 @@ function statusText(st, m, d, px) {
   const pos = Object.values(st.positions || {}), pen = Object.values(st.pending || {});
   const gateOpen = /AÇIK/.test(m.lastGate || ""), btc = Number((m.lastGate || "").match(/BTC 4h ([-\d.]+)%/)?.[1] ?? NaN);
   const scans = d.journal.filter((e) => e.kind === "scan"); let dry = 0; for (const e of scans) { if (/aday yok/.test(e.msg)) dry++; else break; }
-  const off = d.journal.find((e) => e.kind === "info" && /seans dışı/.test(e.msg));
+  const off = d.journal.find((e) => e.kind === "info" && /seans dışı|son giriş saati/.test(e.msg));
   const s = [];
-  if (off && (!scans[0] || off.ts > scans[0].ts)) s.push("Seans dışı, sadece izliyorum.");
+  if (off && (!scans[0] || off.ts > scans[0].ts)) s.push(/son giriş/.test(off.msg) ? "Son giriş saati geçti, yeni işlem açmıyorum." : "Seans dışı, sadece izliyorum.");
   else if (st.halted) s.push("Gün freni devrede: bugün yeni işlem yok.");
   else if (m.lastGate && !gateOpen) s.push(`BTC 4 saatte ${fmt(btc)}% düştü, filtre kapalı: yeni giriş yok.`);
   else if (pen.length) s.push(`${pen.map((p) => p.instId).join(", ")} için alış emri bekliyor.`);
