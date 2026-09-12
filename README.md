@@ -102,6 +102,8 @@ Panel her aracın çağrı sayısını canlı gösterir. Ajan Claude Code'a da M
 `/mod onaylı` insan-döngüde çalışır: her girişten önce ajan Telegram'dan onay ister, 60 saniyede "evet" gelmezse işlem açılmaz; `/mod otonom` kurallar içinde kendi kararıyla döner.
 Komut olmayan her mesaj Karar'ye sorudur: "sabahtan beri neden işlem açmadın" gibi. Cevap günlük bağlamından gelir, uydurma yoktur.
 
+**Haber adayı:** son 45 dakikada izleme listesindeki bir coin hakkında yüksek önemli OKX haberi çıkarsa, teknik kurulum olmasa da Karar katmanına "haber" etiketiyle gider. Karar yalnızca somut ve olumlu haberde (listeleme, ortaklık, mainnet, geri alım, onay) seçebilir; fiyat zaten fırlamışsa (göreli güç > +%3) kovalama sayılır. Aynı risk kuralları, günde en fazla 1 haber işlemi. Haber ayrıca her aday için veto kaynağıdır.
+
 **Kovalayan bot:** aynı veride kırılım kovalayan naif strateji (hacimli 15 dk kırılım, TP +%2 / SL −%1 / 2 saat) emir göndermeden paralel simüle edilir. Panel ve `/durum` "kovalayan bot bugün: x%, ben: y%" karşılaştırmasını canlı gösterir; disiplinin değeri ölçülür, iddia edilmez.
 
 **Doğrulama:** `bun run verify [seq]` batch dosyasını yeniden hash'ler, X Layer'daki işlem verisiyle karşılaştırır ve "EŞLEŞTİ / EŞLEŞMEDİ" der.
