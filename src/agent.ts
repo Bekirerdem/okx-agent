@@ -87,9 +87,14 @@ async function main() {
 
   async function closePosition(id: string, p: Position, why: string) {
     try {
-      const px = await getLast(atk, id);
-      await sellMarket(atk, id, String(p.qty), inst.get(id)?.lotSz ?? 0);
-      const pnl = (px - p.entry) * p.qty - px * p.qty * 0.001;
+      let px = await getLast(atk, id);
+      const sellId = await sellMarket(atk, id, String(p.qty), inst.get(id)?.lotSz ?? 0);
+      let pnl = (px - p.entry) * p.qty - px * p.qty * 0.001;
+      try {   // gerçekleşen satış fiyatı ve komisyon borsadan (tahmin değil)
+        await new Promise((r) => setTimeout(r, 1200));
+        const so = await getOrder(atk, id, sellId, px, p.qty);
+        if (so.avgPx > 0 && so.accFillSz > 0) { px = so.avgPx; pnl = so.accFillSz * so.avgPx - p.qty * p.entry - (so.feeCcy === "USDT" ? Math.abs(so.fee) : 0); }
+      } catch { /* tahminle devam */ }
       st.closed.push({ instId: id, entry: p.entry, exit: px, qty: p.qty, pnl, why, ts: Date.now() });
       st.cooldown[id] = Math.floor(Date.now() / BAR_MS);
       delete st.positions[id];
