@@ -22,7 +22,7 @@ type State = {
   lastBucket: number; postmortem?: boolean; shadow: ShadowState; seenNews?: Record<string, number>; newsTradesToday?: number;
 };
 
-const BAR_MS = 15 * 60_000;
+const BAR_MS = CFG.barMin * 60_000;   // tarama ritmi = mum çözünürlüğü
 const TR_OFFSET_MS = 3 * 3600_000; // Türkiye UTC+3, yaz saati yok
 
 function trNow(): { day: string; hm: string; minutes: number } {
@@ -190,7 +190,7 @@ ${journal}`);
     if (Date.now() - universeTs > CFG.universe.refreshMin * 60_000) { try { universe = await getUniverse(atk); inst = await getInstruments(atk); universeTs = Date.now(); } catch { /* eski izleme listesi */ } }
     if (Date.now() - smartTs > 15 * 60_000) { smart = await getSmartMoney(atk); smartTs = Date.now(); }
 
-    const btc = await getCandles(atk, "BTC-USDT", 40);
+    const btc = await getCandles(atk, "BTC-USDT", 120);
     const gate = btcGate(btc, CFG.gate.btcBars, CFG.gate.btcMinRetPct);
     const slots = canOpen({ equity: st.equity, dayStartEquity: st.dayStartEquity, openPositions: Object.keys(st.positions).length + Object.keys(st.pending).length, tradesToday: st.tradesToday, halted: st.halted }, CFG.risk);
     const bucket = Math.floor(Date.now() / BAR_MS);
@@ -205,7 +205,7 @@ ${journal}`);
       while (idx < queue.length) {
         const t = queue[idx++]!;
         try {
-          const bars = await getCandles(atk, t.instId, 40);
+          const bars = await getCandles(atk, t.instId, 120);
           st.shadow = stepShadow(st.shadow, t.instId, bars, st.equity, Date.now());   // kovalayan bot: kovalayan naif strateji, emir yok
           const sweep = detectSweep(bars, CFG.entry.lookback, CFG.entry.minDepthPct);
           if (!sweep) continue;
@@ -225,7 +225,7 @@ ${journal}`);
     log("scan", `${hm} taraması · ${universe.length} parite · BTC 4 saatlik ${gate.retPct >= 0 ? "+" : ""}${gate.retPct.toFixed(2)}% → filtre ${gate.open ? "açık" : "kapalı"} · ${raw.length ? raw.length + " dip avı adayı: " + raw.map((r) => r.t.instId).join(", ") : "aday yok"}${skipped.length ? ` · ${skipped.length} elendi` : ""}`,
       { candidates: raw.map((r) => `${r.t.instId} d${r.sweep.depthPct.toFixed(2)}`), skipped: skipped.slice(0, 12) });
 
-    if (bucket % 4 === 0) {   // saat başı taraması
+    if (bucket % (60 / CFG.barMin) === 0) {   // saat başı taraması
       const heads = await getImportantNews(atk, 4);
       if (heads.length) log("info", `${hm} piyasa notu (OKX news, yüksek önem): ${heads.map((h) => "• " + h.slice(0, 100)).join(" ")}`, { tg: `<b>${hm} piyasa notu</b> · OKX news${String.fromCharCode(10)}${heads.map((h) => "• " + H(h.slice(0, 120))).join(String.fromCharCode(10))}` });
     }
@@ -243,7 +243,7 @@ ${journal}`);
             const t = universe.find((u) => u.instId === `${coin}-USDT`);
             if (!t || st.positions[t.instId] || st.pending[t.instId] || raw.some((r) => r.t.instId === t.instId) || newsCands.some((x) => x.t.instId === t.instId)) continue;
             if ((st.cooldown[t.instId] ?? -999) > bucket - CFG.risk.cooldownBars) continue;
-            const bars = await getCandles(atk, t.instId, 40);
+            const bars = await getCandles(atk, t.instId, 120);
             const rs = relStrength(bars, btc, CFG.entry.rsBars);
             if (rs > 3) { log("info", `haber adayı elendi: ${t.instId} fiyat zaten fırlamış (RS ${rs.toFixed(1)}%) · "${n.title.slice(0, 80)}"`); continue; }
             newsCands.push({ t, headline: n.title, bars, rs, range: dayRangePct(bars, sStart) });

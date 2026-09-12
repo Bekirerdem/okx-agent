@@ -50,8 +50,8 @@ export async function getInstruments(atk: Atk): Promise<Map<string, Inst>> {
 /** Kapanmış 15m mumlar, artan sıra. */
 export async function getCandles(atk: Atk, instId: string, limit = 60): Promise<Bar[]> {
   let rows: any[];
-  try { rows = await atk.call("market_get_candles", { instId, bar: "15m", limit }); }
-  catch { rows = await rest(`/api/v5/market/candles?instId=${instId}&bar=15m&limit=${limit}`); }
+  try { rows = await atk.call("market_get_candles", { instId, bar: CFG.bar, limit }); }
+  catch { rows = await rest(`/api/v5/market/candles?instId=${instId}&bar=${CFG.bar}&limit=${limit}`); }
   const confirmed = rows.filter((r) => r.length < 9 || String(r[8]) === "1");
   return confirmed.map(toBar).sort((a, b) => a.ts - b.ts);
 }
