@@ -46,13 +46,22 @@ function loadState(day: string): State {
 function saveState(s: State) { mkdirSync("state", { recursive: true }); writeFileSync(CFG.paths.state, JSON.stringify(s, null, 1)); }
 function saveMetrics(m: Record<string, unknown>) { try { writeFileSync("state/metrics.json", JSON.stringify(m)); } catch { /* */ } }
 
+/** Ağ yokken açılışta çökme yerine bekle ve tekrar dene (hotspot kesintileri). */
+async function retry<T>(what: string, fn: () => Promise<T>, tries = 12, waitMs = 10_000): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < tries; i++) {
+    try { return await fn(); } catch (e) { lastErr = e; console.log(`açılış: ${what} başarısız (${i + 1}/${tries}) — ${(e as Error).message?.slice(0, 80)} · ${waitMs / 1000} sn sonra tekrar`); await new Promise((r) => setTimeout(r, waitMs)); }
+  }
+  throw lastErr;
+}
+
 async function main() {
   const atk = new Atk();
-  await atk.connect();
+  await retry("MCP bağlantısı", () => atk.connect());
   const { day } = trNow();
   const st = loadState(day);
-  let inst: Map<string, Inst> = await getInstruments(atk);
-  let universe: Ticker[] = await getUniverse(atk);
+  let inst: Map<string, Inst> = await retry("enstrümanlar", () => getInstruments(atk));
+  let universe: Ticker[] = await retry("izleme listesi", () => getUniverse(atk));
   let universeTs = Date.now();
   let smart = await getSmartMoney(atk); let smartTs = Date.now();
   const last = { scan: "", gate: "", llm: "", cands: [] as Record<string, unknown>[] };
@@ -125,6 +134,13 @@ async function main() {
           const qty = (o.accFillSz || p.sz) + (o.feeCcy === base ? o.fee : 0);   // OKX alış komisyonunu coin cinsinden keser (fee negatif)
           st.positions[id] = { instId: id, qty, entry, target: targetPrice(entry, p.target, CFG.exit.targetMinPct), sl: p.sl, openedTs: Date.now(), openedBucket: Math.floor(Date.now() / BAR_MS), reason: p.reason, oco: true };
           delete st.pending[id];
+          // dolum fiyatı limitten %0,2'den fazla saparsa hedef ve stop gerçek girişe göre yeniden borsaya konur (STORJ dersi: stop %4 yerine %2,55 kalmıştı)
+          if (!CFG.dryRun && Math.abs(entry / p.px - 1) > 0.002) {
+            const i = inst.get(id); const pos = st.positions[id]!;
+            const sl2 = roundPrice(stopPrice(entry, CFG.risk), i?.tickSz ?? 0); const tp2 = roundPrice(pos.target, i?.tickSz ?? 0);
+            try { await placeOco(atk, id, String(roundSize(qty, i?.lotSz ?? 0, 0)), String(tp2), String(sl2)); pos.sl = sl2; log("info", `${id}: dolum ${pctOf(entry, p.px)} sapmış → hedef ${tp2} ve stop ${sl2} gerçek girişe göre yeniden borsaya kondu`); }
+            catch (e) { log("error", `${id} OCO yeniden: ${(e as Error).message?.slice(0, 120)}`); }
+          }
           const tgt = st.positions[id]!.target;
           log("fill", `${id} alındı · ${qty} adet @${entry} · hedef ${tgt.toFixed(4)} (${pctOf(tgt, entry)}) ve stop ${p.sl} borsada (OCO)`, { reason: p.reason,
             tg: `<b>ALIŞ DOLDU · ${id}</b>${String.fromCharCode(10)}${qty.toFixed(4)} adet @ ${entry} (${(qty * entry).toFixed(2)} USDT)${String.fromCharCode(10)}Hedef ${tgt.toFixed(4)} (${pctOf(tgt, entry)}) · stop ${p.sl} (${pctOf(p.sl, entry)}) · ikisi de borsada${String.fromCharCode(10)}<i>${H(p.reason)}</i>` });
