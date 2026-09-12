@@ -83,8 +83,7 @@ export function startCommandLoop(ctx: CmdCtx): void {
           if (m.text.startsWith("/")) { await telegram(await handle(m.text, ctx)); log("info", `komut: ${m.text}`); }
           else {
             const s = ctx.snapshot();
-            const recent = journalLines().slice(-40).map((e) => `${e.ts.slice(11, 19)}Z ${e.role}·${e.kind}: ${e.msg}${e.data?.reason ? " → " + e.data.reason : ""}`).join("
-");
+            const recent = journalLines().slice(-40).map((e) => `${e.ts.slice(11, 19)}Z ${e.role}·${e.kind}: ${e.msg}${e.data?.reason ? " → " + e.data.reason : ""}`).join(String.fromCharCode(10));
             const context = `DURUM: özkaynak ${s.equity.toFixed(2)} USDT, gün başı ${s.dayStart.toFixed(2)}, açık ${s.positions.length}, bekleyen ${s.pending.length}, işlem ${s.trades}, fren ${s.halted ? "aktif" : "yok"}.
 ${s.lastGate}
 SON TARAMA: ${s.lastScan}
