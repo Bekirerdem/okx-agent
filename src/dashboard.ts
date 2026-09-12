@@ -1,5 +1,6 @@
 // Canlı panel: state/ dosyalarını okur, http://localhost:8787. Ajandan bağımsız süreç, emir göndermez.
 import { existsSync, readFileSync } from "node:fs";
+import { ask } from "./llm";
 
 const PORT = Number(process.env.DASH_PORT ?? 8787);
 const read = (p: string) => (existsSync(p) ? readFileSync(p, "utf-8") : "");
@@ -17,11 +18,28 @@ function api() {
 
 const HTML_PATH = `${import.meta.dir}/dashboard.html`;
 
+function askContext(): string {
+  const st = json("state/state.json", {}); const m = json("state/metrics.json", {});
+  const recent = jsonl("state/journal.jsonl").slice(-40).map((e) => `${String(e.ts).slice(11, 19)}Z ${e.role}·${e.kind}: ${e.msg}${e.data?.reason ? " → " + e.data.reason : ""}`).join(String.fromCharCode(10));
+  return [
+    `DURUM: özkaynak ${Number(st.equity ?? 0).toFixed(2)} USDT, gün başı ${Number(st.dayStartEquity ?? 0).toFixed(2)}, açık ${Object.keys(st.positions ?? {}).length}, bekleyen ${Object.keys(st.pending ?? {}).length}, işlem ${st.tradesToday ?? 0}, fren ${st.halted ? "aktif" : "yok"}.`,
+    String(m.lastGate ?? ""), `SON TARAMA: ${m.lastScan ?? ""}`, `SEÇİCİ: ${m.lastLlm ?? ""}`, `GÖLGE BOT: ${m.shadow?.summary ?? ""}`, "SON GÜNLÜK:", recent,
+  ].join(String.fromCharCode(10));
+}
+
 Bun.serve({
   port: PORT,
-  fetch(req) {
+  async fetch(req) {
     const u = new URL(req.url);
     if (u.pathname === "/api/state") return Response.json(api(), { headers: { "cache-control": "no-store" } });
+    if (u.pathname === "/api/ask" && req.method === "POST") {
+      try {
+        const { q } = (await req.json()) as { q?: string };
+        if (!q?.trim()) return Response.json({ error: "soru boş" }, { status: 400 });
+        const answer = await ask(q.trim().slice(0, 300), askContext());
+        return Response.json({ answer });
+      } catch (e) { return Response.json({ error: (e as Error).message?.slice(0, 200) }, { status: 500 }); }
+    }
     return new Response(read(HTML_PATH), { headers: { "content-type": "text/html; charset=utf-8" } });
   },
 });
