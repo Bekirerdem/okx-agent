@@ -40,6 +40,7 @@ export function log(kind: Kind, msg: string, data?: Record<string, unknown>): vo
     appendFileSync(CFG.paths.journal, JSON.stringify(e) + "\n");
     appendFileSync(CFG.paths.md, `- ${line}${clean ? "  \n  `" + JSON.stringify(clean).slice(0, 400) + "`" : ""}\n`);
   } catch (err) { console.error("günlük yazılamadı", err); }
+  if (ANCHOR_KINDS.has(kind) && !CFG.dryRun) anchorQueue(JSON.stringify(e));   // X Layer kuyruğu (diske)
   if (CFG.dryRun) return;                       // dry-run Telegram'a yazmaz; canlı akışla karışmasın
   if (!TG_KINDS.has(kind) && !tg) return;       // açıkça tg metni verilen info satırları (piyasa notu, haber adayı) da gider
   if (kind === "error") {

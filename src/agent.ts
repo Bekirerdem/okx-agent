@@ -8,7 +8,7 @@ import { positionNotional, canOpen, dailyStopHit, stopPrice, roundSize, roundPri
 import { getBalance, placeLimitBuy, getOrder, cancelOrder, sellMarket } from "./exchange";
 import { decide, ask, type Candidate } from "./llm";
 import { log, trTime } from "./journal";
-import { flush as anchorFlush, anchorStatus, anchorAddress } from "./anchor";
+import { flush as anchorFlush, anchorStatus, anchorAddress, pendingCount, lastFlushTs } from "./anchor";
 import { startCommandLoop, getMode, askApproval } from "./commands";
 import { buildReport } from "./report";
 import { emptyShadow, stepShadow, flattenShadow, shadowSummary, type ShadowState } from "./shadow";
@@ -180,7 +180,11 @@ ${journal}`);
         log("snapshot", `kasa ${st.equity.toFixed(2)} USDT (${dayPct()}) · ${Object.keys(st.positions).length} açık · ${Object.keys(st.pending).length} bekleyen · ${st.tradesToday} işlem · MCP ${atk.calls} çağrı ${atk.errors} hata · ${shadowSummary(st.shadow, st.dayStartEquity)}`,
           { tg: `<b>${hm} durum</b>${String.fromCharCode(10)}Kasa ${st.equity.toFixed(2)} USDT (${dayPct()})${String.fromCharCode(10)}${Object.keys(st.positions).length} açık · ${Object.keys(st.pending).length} bekleyen · ${st.tradesToday}/${CFG.risk.maxTradesPerDay} işlem${String.fromCharCode(10)}Kovalayan bot ${shPct >= 0 ? "+" : ""}${shPct.toFixed(2)}% (${st.shadow.trades} işlem) · ben ${dayPct()}` });
       }
-      if (minutes % 15 === 0) { const a = await anchorFlush(); if (a) log("info", `X Layer denetim izi: ${a.n} karar → ${a.root.slice(0, 18)}… ${a.url}`); }
+      if (minutes % 15 === 0 || (pendingCount() > 0 && Date.now() - lastFlushTs > 16 * 60_000)) {
+        const a = await anchorFlush();
+        if (a) log("info", `X Layer denetim izi · ${a.n} karar zincire yazıldı · ${a.url}`, { tg: `<b>X Layer denetim izi</b>${String.fromCharCode(10)}${a.n} karar hash'lendi ve zincire yazıldı${String.fromCharCode(10)}${a.url}` });
+        else if (pendingCount() > 0) log("info", `X Layer: ${anchorStatus()}`);
+      }
     } catch (e) {
       log("error", `tick: ${(e as Error).message?.slice(0, 200)}`);
     }

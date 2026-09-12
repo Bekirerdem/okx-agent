@@ -24,39 +24,50 @@ function existingCount(): number {
   } catch { return 0; }
 }
 
-let batch: string[] = [];
+// Kuyruk DİSKTE tutulur (state/anchor-queue.jsonl): yeniden başlatma ve kesinti batch'i kaybettirmez.
+const QUEUE = "state/anchor-queue.jsonl";
+function readQueue(): string[] {
+  try { return existsSync(QUEUE) ? readFileSync(QUEUE, "utf-8").split(LF).filter((l) => l.trim()) : []; } catch { return []; }
+}
 let seq = existingCount();          // sıra numarası kaldığı yerden devam eder
 let disabled = !PK;
 let lastErr = "";
+export let lastFlushTs = 0;   // açılışta bekleyen kuyruk varsa ilk tick'te yazılır
 
 export function anchorEnabled(): boolean { return !disabled; }
 export function anchorAddress(): string { return PK ? privateKeyToAccount(PK).address : ""; }
+export function pendingCount(): number { return readQueue().length; }
 
-/** Batch'e satır ekle (JSON string). */
-export function queue(line: string): void { if (!disabled) batch.push(line); }
+/** Batch'e satır ekle (JSON string) — diske. */
+export function queue(line: string): void {
+  if (disabled) return;
+  try { mkdirSync("state", { recursive: true }); appendFileSync(QUEUE, line.replace(/[\r\n]+/g, " ") + LF); } catch { /* */ }
+}
 
 /** Batch'i hash'le, zincire yaz, yerel kanıt dosyasına ekle. Döner: {txHash, root, n, url} ya da null. */
 export async function flush(): Promise<{ txHash: string; root: string; n: number; url: string } | null> {
-  if (disabled || !batch.length) return null;
-  const lines = batch; batch = [];
+  if (disabled) return null;
+  const lines = readQueue();
+  if (!lines.length) return null;
   const root = "0x" + createHash("sha256").update(lines.join(LF)).digest("hex");
   try {
     const account = privateKeyToAccount(PK);
     const wallet = createWalletClient({ account, chain, transport: http(RPC, { timeout: 20_000 }) });
     const pub = createPublicClient({ chain, transport: http(RPC, { timeout: 20_000 }) });
     const bal = await pub.getBalance({ address: account.address });
-    if (bal === 0n) { disabled = true; lastErr = "gaz yok"; batch = lines.concat(batch); return null; }
+    if (bal === 0n) { disabled = true; lastErr = "gaz yok"; return null; }
     const txHash = await wallet.sendTransaction({ to: account.address, value: 0n, data: root as Hex });
     seq++;
     mkdirSync("state", { recursive: true });
     appendFileSync("state/anchors.jsonl", JSON.stringify({ seq, ts: new Date().toISOString(), n: lines.length, root, txHash, chainId: CHAIN_ID }) + LF);
     writeFileSync(`state/anchor-batch-${seq}.jsonl`, lines.join(LF) + LF);
+    // yazılan satırlar kuyruktan düşer; bu arada eklenenler kalır
+    const now = readQueue(); writeFileSync(QUEUE, now.slice(lines.length).join(LF) + (now.length > lines.length ? LF : ""));
+    lastFlushTs = Date.now(); lastErr = "";
     return { txHash, root, n: lines.length, url: `${EXPLORER}/tx/${txHash}` };
   } catch (e) {
-    lastErr = (e as Error).message?.slice(0, 160) ?? String(e);
-    batch = lines.concat(batch);          // bir sonraki denemede tekrar
-    if (batch.length > 500) batch = batch.slice(-500);
+    lastErr = (e as Error).message?.slice(0, 160) ?? String(e);   // kuyruk diskte durur, bir sonraki denemede tekrar
     return null;
   }
 }
-export function anchorStatus(): string { return disabled ? `kapalı (${lastErr || "anahtar yok"})` : `açık, bekleyen ${batch.length}, yazılan ${seq}`; }
+export function anchorStatus(): string { return disabled ? `kapalı (${lastErr || "anahtar yok"})` : `açık, bekleyen ${pendingCount()}, yazılan ${seq}${lastErr ? ", son hata: " + lastErr.slice(0, 60) : ""}`; }
