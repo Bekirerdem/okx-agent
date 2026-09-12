@@ -40,7 +40,8 @@ export function log(kind: Kind, msg: string, data?: Record<string, unknown>): vo
     appendFileSync(CFG.paths.journal, JSON.stringify(e) + "\n");
     appendFileSync(CFG.paths.md, `- ${line}${clean ? "  \n  `" + JSON.stringify(clean).slice(0, 400) + "`" : ""}\n`);
   } catch (err) { console.error("günlük yazılamadı", err); }
-  if (!TG_KINDS.has(kind)) return;
+  if (CFG.dryRun) return;                       // dry-run Telegram'a yazmaz; canlı akışla karışmasın
+  if (!TG_KINDS.has(kind) && !tg) return;       // açıkça tg metni verilen info satırları (piyasa notu, haber adayı) da gider
   if (kind === "error") {
     if (msg === lastErr.text) { lastErr.n++; if (lastErr.n % 5 !== 0) return; } else lastErr = { text: msg, n: 1 };
     void telegram(`⚠️ <b>Hata</b> · ${trTime().slice(0, 5)}${lastErr.n > 1 ? ` (${lastErr.n}. kez)` : ""}${String.fromCharCode(10)}${H(msg)}`, true);
