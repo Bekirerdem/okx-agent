@@ -18,7 +18,8 @@ const ICON: Record<Kind, string> = {
 
 const TG = { token: process.env.TG_BOT_TOKEN ?? "", chat: process.env.TG_CHAT_ID ?? "" };
 const TG_KINDS = new Set<Kind>(["boot", "gate", "llm", "entry", "fill", "cancel", "exit", "stop", "halt", "flat", "error", "snapshot"]);
-const ANCHOR_KINDS = new Set<Kind>(["gate", "llm", "reject", "entry", "fill", "cancel", "exit", "stop", "halt", "flat", "snapshot"]);
+// Zincire yalnız kararlar ve emirler gider: Karar'ın seçim/retleri, BTC filtresi kapanışı, alış/satış/stop/fren/gün sonu. Tarama ve 15 dk durum özeti gitmez (boş kayıt hash'lemek anlamsız; 09-12 17:50).
+const ANCHOR_KINDS = new Set<Kind>(["gate", "llm", "reject", "entry", "fill", "cancel", "exit", "stop", "halt", "flat"]);
 
 mkdirSync("state", { recursive: true });
 

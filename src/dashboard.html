@@ -91,6 +91,8 @@
   .kv { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:6px 16px; font-size:14px; }
   .kv div:nth-child(odd) { font-family:"JetBrains Mono"; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .kv div:nth-child(even) { font-family:"JetBrains Mono"; font-weight:700; text-align:right; }
+  .kv.rules { font-size:15px; gap:8px 16px; } .kv.rules div:nth-child(odd) { font-family:"Instrument Sans"; font-size:15px; color:var(--muted); }
+  .row .m .more { font-family:"JetBrains Mono"; font-size:13px; color:var(--acc); cursor:pointer; margin-left:6px; white-space:nowrap; }
   .anchor { font-size:14px; }
   .anchor a { font-family:"JetBrains Mono"; color:var(--ink); text-decoration:underline; text-underline-offset:3px; }
   .askf { display:grid; grid-template-columns:1fr auto; border:2px solid var(--ink); }
@@ -155,7 +157,7 @@
     <div class="gate" id="gate">henüz tarama yok</div>
 
     <div class="label">Risk kuralları · kodda, LLM değiştiremez</div>
-    <div class="cage">işlem başına risk <b>%0,5</b>, tek pozisyon en çok <b>%12,5</b><br>stop <b>%4</b> ve hedef borsada (OCO), ajan kör kalsa da çalışır<br>hedef en çok <b>+%0,5</b> · <b>+%0,35</b> görülünce stop girişin üstüne çekilir<br>aynı anda <b>≤3</b> pozisyon · günde <b>≤10</b> işlem<br>gün zararı <b>−%2</b> olursa fren · <b>18:50</b> sonrası giriş yok · <b>19:15</b>'te her şey nakit</div>
+    <div class="kv rules"><div>pozisyon büyüklüğü</div><div>kasanın %12,5'i</div><div>stop</div><div>−%4 · borsada</div><div>hedef</div><div>+%0,3 … +%0,5 · borsada</div><div>kâr kilidi</div><div>+%0,35'te stop girişe</div><div>aynı anda</div><div>≤3 pozisyon</div><div>günde</div><div>≤10 işlem</div><div>gün freni</div><div>−%2</div><div>son giriş · nakit</div><div>18:50 · 19:15</div></div>
 
     <div class="label">Kovalayan bot ile kıyas</div>
     <div class="duel" id="shadow"><div><div class="n">—</div><div class="k">kovalayan bot</div></div><div><div class="n">—</div><div class="k">ben</div></div></div>
@@ -238,7 +240,8 @@ function stream(d) {
   for (const e of rows) { const g = groups[groups.length - 1]; if (g && g.e.kind === e.kind && g.e.msg === e.msg) { g.n++; g.first = e.ts; } else groups.push({ e, n: 1, first: e.ts }); }
   const vis = groups.filter((g) => !flt || FILTER[flt].includes(g.e.kind));
   $("streamn").textContent = `${vis.length} satır`;
-  $("stream").innerHTML = vis.map(({ e, n, first }) => `<div class="row kind-${e.kind}"><div class="t">${tr(e.ts)}${n > 1 ? `<span class="n">${tr(first)}'den beri</span>` : ""}</div><div class="k">${KIND[e.kind] || e.kind}</div><div class="m">${esc(e.msg).replace(/https?:\/\/\S+/g, (u) => `<a href="${u}" target="_blank" style="color:inherit">zincirde gör</a>`)}${n > 1 ? `<span class="x">×${n}</span>` : ""}${e.data?.reason ? `<span class="d">${esc(e.data.reason)}</span>` : ""}${e.data?.picks?.length ? `<span class="d">${esc(e.data.picks.join("\n"))}</span>` : ""}${e.data?.rejects?.length ? `<span class="d">${esc(e.data.rejects.join("\n"))}</span>` : ""}</div></div>`).join("") || '<span class="empty">bu filtrede kayıt yok</span>';
+  const msg = (s) => { const full = esc(s).replace(/https?:\/\/\S+/g, (u) => `<a href="${u}" target="_blank" style="color:inherit">zincirde gör</a>`); if (s.length <= 200) return full; const i = full.indexOf(" ", 180); return `<span class="short">${full.slice(0, i > 0 ? i : 180)}… <span class="more">devamı</span></span><span class="full" hidden>${full}</span>`; };   // uzun notlar (haber özeti) tek satır, tıkla aç
+  $("stream").innerHTML = vis.map(({ e, n, first }) => `<div class="row kind-${e.kind}"><div class="t">${tr(e.ts)}${n > 1 ? `<span class="n">${tr(first)}'den beri</span>` : ""}</div><div class="k">${KIND[e.kind] || e.kind}</div><div class="m">${msg(e.msg)}${n > 1 ? `<span class="x">×${n}</span>` : ""}${e.data?.reason ? `<span class="d">${esc(e.data.reason)}</span>` : ""}${e.data?.picks?.length ? `<span class="d">${esc(e.data.picks.join("\n"))}</span>` : ""}${e.data?.rejects?.length ? `<span class="d">${esc(e.data.rejects.join("\n"))}</span>` : ""}</div></div>`).join("") || '<span class="empty">bu filtrede kayıt yok</span>';
 }
 
 const STATIC = !!window.__STATIC__;   // dist/index.html: veri gömülü, sunucu yok (yayinla.bat ile 5 dakikada bir yenilenir)
@@ -288,6 +291,10 @@ async function refresh() {
 }
 refresh(); if (!STATIC) setInterval(refresh, 4000);
 if (STATIC) { $("askq").placeholder = "soru kutusu canlı panelde çalışır (bu sayfa anlık görüntü)"; $("askq").disabled = true; $("askb").disabled = true; }
+$("stream").addEventListener("click", (ev) => {
+  const m = ev.target.closest(".more"); if (!m) return;
+  const box = m.closest(".m"); box.querySelector(".short").hidden = true; box.querySelector(".full").hidden = false;
+});
 $("chips").addEventListener("click", (ev) => {
   const b = ev.target.closest("button"); if (!b) return;
   flt = b.dataset.f; for (const x of $("chips").querySelectorAll("button")) x.classList.toggle("on", x === b);
