@@ -1,6 +1,7 @@
 // Karar günlüğü: JSONL (makine) + Markdown (insan) + Telegram (jüri canlı izler).
 import { appendFileSync, mkdirSync } from "node:fs";
 import { CFG } from "./config";
+import { queue as anchorQueue } from "./anchor";
 
 export type Kind = "boot" | "gate" | "scan" | "reject" | "llm" | "entry" | "fill" | "cancel" | "exit" | "stop" | "halt" | "flat" | "error" | "snapshot" | "info";
 export type Entry = { ts: string; kind: Kind; role: string; msg: string; data?: Record<string, unknown> };
@@ -17,6 +18,7 @@ const ICON: Record<Kind, string> = {
 
 const TG = { token: process.env.TG_BOT_TOKEN ?? "", chat: process.env.TG_CHAT_ID ?? "" };
 const TG_KINDS = new Set<Kind>(["boot", "gate", "llm", "entry", "fill", "cancel", "exit", "stop", "halt", "flat", "error", "snapshot"]);
+const ANCHOR_KINDS = new Set<Kind>(["gate", "llm", "reject", "entry", "fill", "cancel", "exit", "stop", "halt", "flat", "snapshot"]);
 
 mkdirSync("state", { recursive: true });
 

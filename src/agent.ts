@@ -8,6 +8,7 @@ import { positionNotional, canOpen, dailyStopHit, stopPrice, roundSize, roundPri
 import { getBalance, placeLimitBuy, getOrder, cancelOrder, sellMarket } from "./exchange";
 import { decide, type Candidate } from "./llm";
 import { log, trTime } from "./journal";
+import { flush as anchorFlush, anchorStatus, anchorAddress } from "./anchor";
 
 type Position = { instId: string; qty: number; entry: number; target: number; sl: number; openedTs: number; openedBucket: number; reason: string };
 type Pending = { instId: string; ordId: string; px: number; sz: number; target: number; sl: number; ts: number; reason: string };
@@ -61,7 +62,7 @@ async function main() {
   }
   saveState(st);
   log("boot", `ajan ayakta | ${CFG.dryRun ? "DRY-RUN" : "CANLI"} | özkaynak ${st.equity.toFixed(2)} USDT | evren ${universe.length} parite | LLM ${CFG.llm.provider}`,
-    { dayStartEquity: st.dayStartEquity, positions: Object.keys(st.positions), risk: CFG.risk });
+    { dayStartEquity: st.dayStartEquity, positions: Object.keys(st.positions), risk: CFG.risk, anchor: anchorStatus(), anchorAddress: anchorAddress() });
 
   async function flattenAll(why: string) {
     for (const [id, p] of Object.entries(st.pending)) {
@@ -130,6 +131,7 @@ async function main() {
         else log("info", `${hm}: seans dışı, sadece izleme`);
       }
       if (minutes % 15 === 0) log("snapshot", `özkaynak ${st.equity.toFixed(2)} USDT (${((st.equity / st.dayStartEquity - 1) * 100).toFixed(2)}%) | açık ${Object.keys(st.positions).length} | bekleyen ${Object.keys(st.pending).length} | işlem ${st.tradesToday} | MCP çağrı ${atk.calls} hata ${atk.errors}`);
+      if (minutes % 15 === 0) { const a = await anchorFlush(); if (a) log("info", `X Layer denetim izi: ${a.n} karar → ${a.root.slice(0, 18)}… ${a.url}`); }
     } catch (e) {
       log("error", `tick: ${(e as Error).message?.slice(0, 200)}`);
     }
