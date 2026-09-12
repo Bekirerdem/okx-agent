@@ -1,5 +1,20 @@
 import { describe, expect, test } from "bun:test";
-import { detectSweep, btcGate, relStrength, targetPrice, bookImbalance, type Bar } from "../src/signals";
+import { detectSweep, btcGate, relStrength, targetPrice, bookImbalance, rsi, ema, atrPct, volRatio, technicalContext, type Bar } from "../src/signals";
+
+describe("teknik bağlam", () => {
+  test("sürekli yükselen seride RSI > 70, düşende < 30", () => {
+    const up = Array.from({ length: 30 }, (_, i) => 100 + i);
+    const dn = Array.from({ length: 30 }, (_, i) => 100 - i);
+    expect(rsi(up)).toBeGreaterThan(70); expect(rsi(dn)).toBeLessThan(30);
+  });
+  test("EMA sabit seride sabittir", () => { expect(ema([5, 5, 5, 5], 3).at(-1)).toBe(5); });
+  test("ATR% ve hacim oranı", () => {
+    const bars: Bar[] = Array.from({ length: 30 }, (_, i) => ({ ts: i, o: 100, h: 101, l: 99, c: 100, v: i === 29 ? 3 : 1 }));
+    expect(atrPct(bars)).toBeCloseTo(2, 6);
+    expect(volRatio(bars)).toBeCloseTo(3, 6);
+    expect(technicalContext(bars, 0).trend).toBe("yatay");
+  });
+});
 
 const mk = (o: number, h: number, l: number, c: number, i = 0): Bar => ({ ts: i, o, h, l, c, v: 1 });
 

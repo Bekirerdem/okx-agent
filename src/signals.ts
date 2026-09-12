@@ -50,6 +50,72 @@ export function targetPrice(entry: number, mid: number, minPct = 0.3): number {
   return Math.max(mid, entry * (1 + minPct / 100));
 }
 
+/* ---------- Teknik bağlam: Karar katmanına verilir, tetik DEĞİLDİR (26 haftada tetik olarak hepsi eksi) ---------- */
+
+export function ema(vals: number[], n: number): number[] {
+  if (!vals.length) return [];
+  const k = 2 / (n + 1); const out = [vals[0]!];
+  for (let i = 1; i < vals.length; i++) out.push(out[i - 1]! + k * (vals[i]! - out[i - 1]!));
+  return out;
+}
+
+export function rsi(vals: number[], n = 14): number {
+  if (vals.length < n + 1) return 50;
+  let g = 0, l = 0;
+  for (let i = 1; i <= n; i++) { const d = vals[i]! - vals[i - 1]!; if (d > 0) g += d; else l -= d; }
+  g /= n; l /= n;
+  for (let i = n + 1; i < vals.length; i++) {
+    const d = vals[i]! - vals[i - 1]!;
+    g = (g * (n - 1) + Math.max(d, 0)) / n; l = (l * (n - 1) + Math.max(-d, 0)) / n;
+  }
+  return l === 0 ? 100 : 100 - 100 / (1 + g / l);
+}
+
+/** ATR'nin fiyata oranı (%). */
+export function atrPct(bars: Bar[], n = 14): number {
+  if (bars.length < n + 1) return 0;
+  const trs: number[] = [];
+  for (let i = bars.length - n; i < bars.length; i++) {
+    const b = bars[i]!, p = bars[i - 1]!;
+    trs.push(Math.max(b.h - b.l, Math.abs(b.h - p.c), Math.abs(b.l - p.c)));
+  }
+  return (trs.reduce((s, x) => s + x, 0) / n) / bars[bars.length - 1]!.c * 100;
+}
+
+/** Oturum VWAP'ına uzaklık (%): + üstünde, − altında. */
+export function vwapDistPct(bars: Bar[], sessionStartTs: number): number {
+  const s = bars.filter((b) => b.ts >= sessionStartTs);
+  if (!s.length) return 0;
+  let pv = 0, vv = 0;
+  for (const b of s) { pv += ((b.h + b.l + b.c) / 3) * b.v; vv += b.v; }
+  if (!vv) return 0;
+  return (s[s.length - 1]!.c / (pv / vv) - 1) * 100;
+}
+
+/** Son mum hacmi / önceki n mum ortalaması. */
+export function volRatio(bars: Bar[], n = 24): number {
+  if (bars.length < n + 1) return 1;
+  const prev = bars.slice(bars.length - 1 - n, bars.length - 1);
+  const avg = prev.reduce((s, b) => s + b.v, 0) / n;
+  return avg ? bars[bars.length - 1]!.v / avg : 1;
+}
+
+export type Ta = { rsi: number; trend: "yukarı" | "aşağı" | "yatay"; atrPct: number; vwapDist: number; volRatio: number };
+
+export function technicalContext(bars: Bar[], sessionStartTs: number): Ta {
+  const c = bars.map((b) => b.c);
+  const e20 = ema(c, 20), e50 = ema(c, 50);
+  const a = e20[e20.length - 1] ?? 0, b = e50[e50.length - 1] ?? 0;
+  const diff = b ? (a / b - 1) * 100 : 0;
+  return {
+    rsi: +rsi(c, 14).toFixed(1),
+    trend: diff > 0.15 ? "yukarı" : diff < -0.15 ? "aşağı" : "yatay",
+    atrPct: +atrPct(bars, 14).toFixed(2),
+    vwapDist: +vwapDistPct(bars, sessionStartTs).toFixed(2),
+    volRatio: +volRatio(bars, 24).toFixed(2),
+  };
+}
+
 /** Emir defteri alış/satış derinlik oranı (±bandPct). >1 alıcı ağır. */
 export function bookImbalance(bids: [number, number][], asks: [number, number][], bandPct = 1.0): number {
   if (!bids.length || !asks.length) return 1;

@@ -7,6 +7,7 @@ import { CFG } from "./config";
 export type Candidate = {
   instId: string; close: number; depthPct: number; mid: number; rs4h: number; dayRangePct: number; volUsd: number;
   bookImb: number; smart?: { longRatio: number; traders: number; vs24h: number }; news: string[]; sentiment?: { score: number; label: string } | null;
+  ta?: { rsi: number; trend: string; atrPct: number; vwapDist: number; volRatio: number };
 };
 export type Decision = { picks: { instId: string; reason: string }[]; rejects: { instId: string; reason: string }[]; note: string; provider: string };
 
@@ -17,12 +18,13 @@ function prompt(cands: Candidate[], freeSlots: number, ctx: { btcRetPct: number;
     smart_money: c.smart ? { long_ratio: +c.smart.longRatio.toFixed(2), traders: c.smart.traders, vs24h: +c.smart.vs24h.toFixed(2) } : null,
     news_6h_high: c.news.slice(0, 3),
     sentiment_24h: c.sentiment ? `${c.sentiment.label} (${c.sentiment.score})` : null,
+    technical_15m: c.ta ? { rsi14: c.ta.rsi, ema20_vs_ema50: c.ta.trend, atr_pct: c.ta.atrPct, vwap_distance_pct: c.ta.vwapDist, volume_ratio_24: c.ta.volRatio } : null,
   }));
   return `Sen bir spot kripto trading ajanının KARAR katmanısın. Cumartesi, OKX TR, long-only, saat ${ctx.tr} (TR).
 Tez: Cumartesi geri dönüş piyasası; stopları avlanmış (dip avı + içeri yeşil kapanış) coin alınır, 3 saatlik aralığın ortasına dönünce satılır.
 BTC 4 saatlik getiri: ${ctx.btcRetPct.toFixed(2)}%. Kasa: ${ctx.equity.toFixed(2)} USDT. Boş slot: ${freeSlots}.
 Yetkin: adaylar arasından en fazla ${freeSlots} tanesini SEÇMEK ya da hepsini reddetmek. Boyut, stop, BTC filtresi ve fren kod tarafındadır, onları tartışma.
-Seçim ölçütleri: (1) haberde delist/hack/exploit/soruşturma varsa KESİN RED; (2) emir defteri alıcı ağır (>1) ise artı; (3) smart money long oranı çok yüksek (>0.9) ve 24h'de artmışsa kalabalık uyarısı, çok düşükse (<0.4) squeeze potansiyeli; (4) göreli güç +2'ye yakınsa kovalama riski; (5) dip avı derinliği ve gün aralığı yüksekse gerçek stop avı olasılığı yüksek.
+Seçim ölçütleri: (1) haberde delist/hack/exploit/soruşturma varsa KESİN RED; (2) emir defteri alıcı ağır (>1) ise artı; (3) smart money long oranı çok yüksek (>0.9) ve 24h'de artmışsa kalabalık uyarısı, çok düşükse (<0.4) squeeze potansiyeli; (4) göreli güç +2'ye yakınsa kovalama riski; (5) dip avı derinliği ve gün aralığı yüksekse gerçek stop avı olasılığı yüksek; (6) teknik bağlam: RSI çok düşükse (<35) geri dönüş potansiyeli artı, EMA20<EMA50 (aşağı trend) ve VWAP'ın çok altındaysa "düşen bıçak" riski, hacim oranı >1.5 stop avının gerçek olduğunu destekler, ATR yüksekse hedefe ulaşma olasılığı artar ama stop riski de.
 Kısa, Türkçe, somut gerekçe yaz. SADECE şu JSON'u döndür, başka metin yok:
 {"picks":[{"instId":"...","reason":"..."}],"rejects":[{"instId":"...","reason":"..."}],"note":"tek cümle rejim yorumu"}
 ADAYLAR:

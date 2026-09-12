@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { CFG } from "./config";
 import { Atk } from "./mcp";
 import { getUniverse, getInstruments, getCandles, getLast, getBook, getSmartMoney, getNews, getSentiment, getImportantNews, type Inst, type Ticker } from "./market";
-import { detectSweep, relStrength, btcGate, dayRangePct, targetPrice, bookImbalance, type Bar } from "./signals";
+import { detectSweep, relStrength, btcGate, dayRangePct, targetPrice, bookImbalance, technicalContext, type Bar } from "./signals";
 import { positionNotional, canOpen, dailyStopHit, stopPrice, roundSize, roundPrice } from "./risk";
 import { getBalance, placeLimitBuy, getOrder, cancelOrder, sellMarket } from "./exchange";
 import { decide, ask, type Candidate } from "./llm";
@@ -174,7 +174,7 @@ ${journal}`);
     const sStart = sessionStartTs();
 
     // tarama (5 paralel)
-    const raw: { t: Ticker; sweep: NonNullable<ReturnType<typeof detectSweep>>; rs: number; range: number }[] = [];
+    const raw: { t: Ticker; sweep: NonNullable<ReturnType<typeof detectSweep>>; rs: number; range: number; bars: Bar[] }[] = [];
     const skipped: string[] = [];
     const queue = universe.filter((t) => !st.positions[t.instId] && !st.pending[t.instId]);
     let idx = 0;
@@ -192,7 +192,7 @@ ${journal}`);
           const rs = relStrength(bars, btc, CFG.entry.rsBars);
           if (rs > CFG.entry.maxRs4hPct) { skipped.push(`${t.instId} (RS ${rs.toFixed(1)}% kovalama)`); continue; }
           if ((st.cooldown[t.instId] ?? -999) > bucket - CFG.risk.cooldownBars) { skipped.push(`${t.instId} (cooldown)`); continue; }
-          raw.push({ t, sweep, rs, range: dayRangePct(bars, sStart) });
+          raw.push({ t, sweep, rs, range: dayRangePct(bars, sStart), bars });
         } catch (e) { skipped.push(`${t.instId} (veri: ${(e as Error).message?.slice(0, 40)})`); }
       }
     }));
@@ -219,10 +219,11 @@ ${journal}`);
       const coin = r.t.instId.split("-")[0]!;
       news = await getNews(atk, coin);
       const sentiment = await getSentiment(atk, coin);
-      return { instId: r.t.instId, close: r.sweep.close, depthPct: r.sweep.depthPct, mid: r.sweep.mid, rs4h: r.rs, dayRangePct: r.range, volUsd: r.t.volUsd, bookImb, smart: smart.get(coin), news, sentiment };
+      const ta = technicalContext(r.bars, sStart);
+      return { instId: r.t.instId, close: r.sweep.close, depthPct: r.sweep.depthPct, mid: r.sweep.mid, rs4h: r.rs, dayRangePct: r.range, volUsd: r.t.volUsd, bookImb, smart: smart.get(coin), news, sentiment, ta };
     }));
 
-    last.cands = cands.map((c) => ({ instId: c.instId, close: c.close, depth: +c.depthPct.toFixed(2), mid: c.mid, rs4h: +c.rs4h.toFixed(2), range: +c.dayRangePct.toFixed(2), book: +c.bookImb.toFixed(2), smart: c.smart ? +c.smart.longRatio.toFixed(2) : null, sentiment: c.sentiment?.label ?? null, news: c.news.length, hm }));
+    last.cands = cands.map((c) => ({ instId: c.instId, close: c.close, depth: +c.depthPct.toFixed(2), mid: c.mid, rs4h: +c.rs4h.toFixed(2), range: +c.dayRangePct.toFixed(2), book: +c.bookImb.toFixed(2), smart: c.smart ? +c.smart.longRatio.toFixed(2) : null, sentiment: c.sentiment?.label ?? null, news: c.news.length, hm, rsi: c.ta?.rsi ?? null, trend: c.ta?.trend ?? null, atr: c.ta?.atrPct ?? null, vwap: c.ta?.vwapDist ?? null, volr: c.ta?.volRatio ?? null }));
     const d = await decide(cands, freeSlots, { btcRetPct: gate.retPct, equity: st.equity, tr: hm });
     last.llm = [`Karar (${d.provider}): ${d.note}`, ...d.picks.map((p) => `✅ ${p.instId}: ${p.reason}`), ...d.rejects.map((p) => `⛔ ${p.instId}: ${p.reason}`)].join(String.fromCharCode(10));
     log("llm", `${d.provider}: ${d.picks.length} seçim, ${d.rejects.length} ret. ${d.note}`, {
