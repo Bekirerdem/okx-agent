@@ -1,5 +1,5 @@
 // X Layer denetim izi: karar günlüğü toplu hash'lenir, 0 değerli işlemle zincire yazılır.
-// Günlük sonradan değiştirilemez: jüri zincirdeki hash ile dosyadaki batch'i karşılaştırabilir.
+// Günlük sonradan değiştirilemez: jüri zincirdeki hash ile dosyadaki batch'i karşılaştırabilir (scripts/verify.ts).
 // Anahtar/gaz yoksa modül kendini kapatır; ajan etkilenmez.
 import { createHash } from "node:crypto";
 import { appendFileSync, mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
@@ -10,15 +10,22 @@ const RPC = process.env.ANCHOR_RPC ?? "https://testrpc.xlayer.tech";
 const CHAIN_ID = Number(process.env.ANCHOR_CHAIN_ID ?? 1952);
 const EXPLORER = process.env.ANCHOR_EXPLORER ?? "https://www.oklink.com/xlayer-test";
 const PK = (process.env.ANCHOR_PK ?? "") as Hex;
+const LF = String.fromCharCode(10);
 
 const chain = defineChain({
   id: CHAIN_ID, name: "X Layer", nativeCurrency: { name: "OKB", symbol: "OKB", decimals: 18 },
   rpcUrls: { default: { http: [RPC] } }, blockExplorers: { default: { name: "OKLink", url: EXPLORER } },
 });
 
+function existingCount(): number {
+  try {
+    if (!existsSync("state/anchors.jsonl")) return 0;
+    return readFileSync("state/anchors.jsonl", "utf-8").split(LF).filter((l) => l.trim()).length;
+  } catch { return 0; }
+}
+
 let batch: string[] = [];
-let seq = (() => { try { return existsSync("state/anchors.jsonl") ? readFileSync("state/anchors.jsonl", "utf-8").trim().split(/?
-/).filter(Boolean).length : 0; } catch { return 0; } })();
+let seq = existingCount();          // sıra numarası kaldığı yerden devam eder
 let disabled = !PK;
 let lastErr = "";
 
@@ -28,11 +35,11 @@ export function anchorAddress(): string { return PK ? privateKeyToAccount(PK).ad
 /** Batch'e satır ekle (JSON string). */
 export function queue(line: string): void { if (!disabled) batch.push(line); }
 
-/** Batch'i hash'le, zincire yaz, yerel kanıt dosyasına ekle. Döner: {txHash, root, n} ya da null. */
+/** Batch'i hash'le, zincire yaz, yerel kanıt dosyasına ekle. Döner: {txHash, root, n, url} ya da null. */
 export async function flush(): Promise<{ txHash: string; root: string; n: number; url: string } | null> {
   if (disabled || !batch.length) return null;
   const lines = batch; batch = [];
-  const root = "0x" + createHash("sha256").update(lines.join("\n")).digest("hex");
+  const root = "0x" + createHash("sha256").update(lines.join(LF)).digest("hex");
   try {
     const account = privateKeyToAccount(PK);
     const wallet = createWalletClient({ account, chain, transport: http(RPC, { timeout: 20_000 }) });
@@ -42,8 +49,8 @@ export async function flush(): Promise<{ txHash: string; root: string; n: number
     const txHash = await wallet.sendTransaction({ to: account.address, value: 0n, data: root as Hex });
     seq++;
     mkdirSync("state", { recursive: true });
-    appendFileSync("state/anchors.jsonl", JSON.stringify({ seq, ts: new Date().toISOString(), n: lines.length, root, txHash, chainId: CHAIN_ID }) + "\n");
-    appendFileSync(`state/anchor-batch-${seq}.jsonl`, lines.join("\n") + "\n");
+    appendFileSync("state/anchors.jsonl", JSON.stringify({ seq, ts: new Date().toISOString(), n: lines.length, root, txHash, chainId: CHAIN_ID }) + LF);
+    writeFileSync(`state/anchor-batch-${seq}.jsonl`, lines.join(LF) + LF);
     return { txHash, root, n: lines.length, url: `${EXPLORER}/tx/${txHash}` };
   } catch (e) {
     lastErr = (e as Error).message?.slice(0, 160) ?? String(e);
