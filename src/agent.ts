@@ -43,6 +43,7 @@ function loadState(day: string): State {
   return { day, dayStartEquity: 0, equity: 0, halted: false, tradesToday: 0, positions: {}, pending: {}, cooldown: {}, seen: {}, closed: [], lastBucket: 0 };
 }
 function saveState(s: State) { mkdirSync("state", { recursive: true }); writeFileSync(CFG.paths.state, JSON.stringify(s, null, 1)); }
+function saveMetrics(m: Record<string, unknown>) { try { writeFileSync("state/metrics.json", JSON.stringify(m)); } catch { /* */ } }
 
 async function main() {
   const atk = new Atk();
@@ -140,6 +141,7 @@ async function main() {
       log("error", `tick: ${(e as Error).message?.slice(0, 200)}`);
     }
     saveState(st);
+    saveMetrics({ ts: Date.now(), mode: CFG.dryRun ? "dry" : "live", mcpCalls: atk.calls, mcpErrors: atk.errors, byTool: atk.byTool, lastScan: last.scan, lastGate: last.gate, lastLlm: last.llm, anchor: anchorStatus(), universe: universe.length, llm: CFG.llm.provider });
   }
 
   async function onBarClose() {

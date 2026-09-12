@@ -76,6 +76,17 @@ bun run agent               # canlı
 bun run report              # performans dökümü
 ```
 
+## Etkileşim
+
+Telegram (sadece sahibin sohbeti): `/durum` · `/pozisyon` (anlık kâr/zarar) · `/adaylar` (son tarama + Seçici'nin gerekçeleri) ·
+`/neden COIN` (günlükten o coinin kararları) · `/kurallar` · `/rapor` · `/dur` (acil fren, hepsini sat) · `/devam` · `/zincir` (X Layer izi).
+Panel: `bun run dashboard` → http://localhost:8787 (canlı karar akışı, pozisyonlar, özkaynak, MCP araç defteri, zincir kayıtları).
+
+## Denetim izi (X Layer)
+
+Her 15 dakikada karar günlüğü batch'i SHA-256 ile hash'lenir ve X Layer testnet'e (chain 1952) sıfır değerli işlemin data alanına yazılır.
+`state/anchors.jsonl` tx hash + batch dosyasını tutar; günlük sonradan değiştirilemez. Gaz yoksa modül kendini kapatır, ajan etkilenmez.
+
 ## Araştırma
 
 `docs/spec.md` tasarım; strateji araştırması (6 ve 26 haftalık faktör testleri, gün simülasyonları) etkinlik öncesi

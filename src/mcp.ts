@@ -7,6 +7,7 @@ export class Atk {
   private client: Client | null = null;
   calls = 0;
   errors = 0;
+  byTool: Record<string, number> = {};
 
   async connect(): Promise<void> {
     const transport = new StdioClientTransport({
@@ -30,7 +31,7 @@ export class Atk {
     let lastErr: unknown;
     for (let i = 0; i < tries; i++) {
       try {
-        this.calls++;
+        this.calls++; this.byTool[name] = (this.byTool[name] ?? 0) + 1;
         const res: any = await this.client.callTool({ name, arguments: args }, undefined, { timeout: 25_000 });
         const text = res?.content?.find((c: any) => c.type === "text")?.text ?? "";
         let obj: any;
