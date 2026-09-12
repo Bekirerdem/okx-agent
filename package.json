@@ -9,7 +9,8 @@
     "once": "bun run src/agent.ts --once",
     "report": "bun run src/report.ts",
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "dashboard": "bun run src/dashboard.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

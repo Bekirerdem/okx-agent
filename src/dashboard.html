@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>okx-agent · karar odası</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* PALETTE  bg #0b0d10 88% · ink #e8e6df · muted #8a8f98 · accent (tek) #ffb000 ≤ 4% · pozitif #4cc38a · negatif #e5484d
+     TYPE     display JetBrains Mono 700 · body Instrument Sans · label mono 11px uppercase
+     LAYOUT   rail 300px | ana sütun | yardımcı 360px · THE MOVE: özkaynak sayısı kenardan taşar
+     REFUSALS gradient yok · gölge yok · kart grid yok · ikon yok · ortalanmış hiçbir şey yok */
+  :root { --bg:#0b0d10; --panel:#101318; --line:#1d222a; --ink:#e8e6df; --muted:#8a8f98; --acc:#ffb000; --up:#4cc38a; --dn:#e5484d; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { height:100%; background:var(--bg); color:var(--ink); font-family:"Instrument Sans",system-ui,sans-serif; font-size:14px; line-height:1.4; }
+  .mono { font-family:"JetBrains Mono",ui-monospace,monospace; }
+  .grid { display:grid; grid-template-columns:300px 1fr 360px; grid-template-rows:56px 1fr; height:100vh; }
+  header { grid-column:1/-1; display:flex; align-items:center; gap:24px; padding:0 20px; border-bottom:1px solid var(--line); }
+  header .name { font-family:"JetBrains Mono"; font-weight:700; letter-spacing:.02em; }
+  header .mode { font-family:"JetBrains Mono"; font-size:11px; letter-spacing:.14em; text-transform:uppercase; padding:3px 8px; border:1px solid var(--line); }
+  header .mode.live { border-color:var(--acc); color:var(--acc); }
+  header .spacer { flex:1; }
+  header .clock { font-family:"JetBrains Mono"; color:var(--muted); }
+  .rail, .aux { border-right:1px solid var(--line); overflow:auto; padding:20px; }
+  .aux { border-right:0; border-left:1px solid var(--line); }
+  .main { overflow:auto; padding:20px 28px; }
+  .label { font-family:"JetBrains Mono"; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin:22px 0 8px; }
+  .label:first-child { margin-top:0; }
+  .equity { font-family:"JetBrains Mono"; font-weight:700; font-size:56px; line-height:1; letter-spacing:-.03em; margin-left:-2px; white-space:nowrap; }
+  .equity small { font-size:18px; font-weight:400; color:var(--muted); margin-left:6px; }
+  .delta { font-family:"JetBrains Mono"; font-size:16px; margin-top:6px; }
+  .up { color:var(--up); } .dn { color:var(--dn); } .acc { color:var(--acc); }
+  .kv { display:grid; grid-template-columns:1fr auto; gap:4px 12px; font-family:"JetBrains Mono"; font-size:12.5px; }
+  .kv div:nth-child(even) { text-align:right; color:var(--ink); }
+  .kv div:nth-child(odd) { color:var(--muted); }
+  .gate { font-family:"JetBrains Mono"; font-size:12.5px; padding:10px 12px; border:1px solid var(--line); border-left:3px solid var(--muted); }
+  .gate.open { border-left-color:var(--up); } .gate.closed { border-left-color:var(--dn); }
+  .stream { display:flex; flex-direction:column; gap:0; }
+  .row { display:grid; grid-template-columns:52px 84px 1fr; gap:14px; padding:9px 0; border-bottom:1px solid var(--line); font-size:13.5px; }
+  .row .t { font-family:"JetBrains Mono"; font-size:12px; color:var(--muted); padding-top:2px; }
+  .row .r { font-family:"JetBrains Mono"; font-size:11px; letter-spacing:.1em; text-transform:uppercase; padding-top:3px; color:var(--muted); }
+  .row .r.Seçici { color:var(--acc); } .row .r.Hakem { color:var(--dn); } .row .r.İcracı { color:var(--up); } .row .r.Gözcü { color:var(--ink); }
+  .row .m { color:var(--ink); word-break:break-word; }
+  .row .m .d { display:block; color:var(--muted); font-size:12.5px; margin-top:3px; white-space:pre-wrap; }
+  .row.kind-entry .m, .row.kind-fill .m, .row.kind-exit .m { color:var(--up); }
+  .row.kind-stop .m, .row.kind-halt .m, .row.kind-error .m { color:var(--dn); }
+  .row.kind-llm .m { color:var(--ink); }
+  .pos { padding:10px 0; border-bottom:1px solid var(--line); font-family:"JetBrains Mono"; font-size:12.5px; }
+  .pos b { font-weight:700; } .pos .sub { color:var(--muted); font-size:12px; margin-top:3px; font-family:"Instrument Sans"; }
+  .tools { display:grid; grid-template-columns:1fr auto; gap:3px 10px; font-family:"JetBrains Mono"; font-size:11.5px; color:var(--muted); }
+  .tools div:nth-child(even) { text-align:right; color:var(--ink); }
+  .bar { height:3px; background:var(--line); margin-top:2px; } .bar i { display:block; height:3px; background:var(--acc); }
+  .anchor a { color:var(--ink); text-decoration:none; border-bottom:1px solid var(--line); }
+  .anchor { font-family:"JetBrains Mono"; font-size:11.5px; color:var(--muted); padding:6px 0; border-bottom:1px solid var(--line); }
+  .llm { border:1px solid var(--line); padding:14px 16px; white-space:pre-wrap; font-size:13.5px; }
+  .llm .h { font-family:"JetBrains Mono"; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--acc); margin-bottom:8px; }
+  svg { width:100%; height:64px; display:block; }
+  .empty { color:var(--muted); font-style:italic; }
+  .cage { font-family:"JetBrains Mono"; font-size:11.5px; color:var(--muted); line-height:1.7; }
+  .cage b { color:var(--ink); font-weight:500; }
+</style>
+</head>
+<body>
+<div class="grid">
+  <header>
+    <span class="name">okx-agent</span>
+    <span class="mode" id="mode">—</span>
+    <span class="mono" id="hdr" style="color:var(--muted)"></span>
+    <span class="spacer"></span>
+    <span class="clock" id="clock"></span>
+  </header>
+
+  <aside class="rail">
+    <div class="label">Özkaynak</div>
+    <div class="equity" id="eq">—<small>USDT</small></div>
+    <div class="delta" id="delta"></div>
+    <svg id="spark" viewBox="0 0 300 64" preserveAspectRatio="none"></svg>
+
+    <div class="label">Kapı</div>
+    <div class="gate" id="gate">henüz tarama yok</div>
+
+    <div class="label">Sayaçlar</div>
+    <div class="kv" id="kv"></div>
+
+    <div class="label">Risk kafesi · kod, LLM erişemez</div>
+    <div class="cage">işlem başı risk <b>%0,5</b> · stop <b>%4</b> borsada<br>pozisyon tavanı <b>%12,5</b> · aynı anda <b>≤3</b><br>günde <b>≤10</b> işlem · gün freni <b>−%2</b><br>BTC 4h &lt; <b>−%1</b> → giriş yok · <b>19:15</b> nakit</div>
+
+    <div class="label">ATK MCP araç defteri</div>
+    <div class="tools" id="tools"></div>
+
+    <div class="label">X Layer denetim izi</div>
+    <div id="anchors"></div>
+  </aside>
+
+  <main class="main">
+    <div class="label">Seçici'nin son kararı</div>
+    <div class="llm" id="llm"><span class="empty">henüz aday oluşmadı</span></div>
+    <div class="label">Karar akışı · Gözcü / Seçici / Hakem / İcracı / Kâtip</div>
+    <div class="stream" id="stream"></div>
+  </main>
+
+  <aside class="aux">
+    <div class="label">Açık pozisyonlar</div>
+    <div id="positions"><span class="empty">nakitteyim</span></div>
+    <div class="label">Bekleyen emirler</div>
+    <div id="pending"><span class="empty">yok</span></div>
+    <div class="label">Kapanan işlemler</div>
+    <div id="closed"><span class="empty">yok</span></div>
+    <div class="label">Son tarama</div>
+    <div id="scan" class="cage"></div>
+  </aside>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+const fmt = (n, d = 2) => (n === undefined || n === null || isNaN(n)) ? "—" : Number(n).toLocaleString("tr-TR", { minimumFractionDigits: d, maximumFractionDigits: d });
+const tr = (iso) => new Date(iso).toLocaleTimeString("tr-TR", { timeZone: "Europe/Istanbul", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const esc = (s) => String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+function spark(snaps) {
+  const svg = $("spark"); if (!snaps.length) { svg.innerHTML = ""; return; }
+  const eq = snaps.map((s) => s.eq); const min = Math.min(...eq), max = Math.max(...eq); const span = (max - min) || 1;
+  const pts = eq.map((v, i) => `${(i / Math.max(1, eq.length - 1)) * 300},${62 - ((v - min) / span) * 58}`).join(" ");
+  svg.innerHTML = `<polyline points="${pts}" fill="none" stroke="#ffb000" stroke-width="1.5"/>`;
+}
+async function refresh() {
+  const d = await (await fetch("/api/state", { cache: "no-store" })).json();
+  const st = d.state, m = d.metrics;
+  $("clock").textContent = new Date().toLocaleTimeString("tr-TR", { timeZone: "Europe/Istanbul" });
+  $("mode").textContent = m ? (m.mode === "live" ? "canlı" : "dry-run") : "bağlı değil";
+  $("mode").className = "mode" + (m?.mode === "live" ? " live" : "");
+  $("hdr").textContent = m ? `${m.universe} parite · LLM ${m.llm} · ${m.mcpCalls} MCP çağrısı` : "";
+  if (st) {
+    $("eq").innerHTML = `${fmt(st.equity)}<small>USDT</small>`;
+    const p = st.dayStartEquity ? (st.equity / st.dayStartEquity - 1) * 100 : 0;
+    $("delta").innerHTML = `<span class="${p >= 0 ? "up" : "dn"}">${p >= 0 ? "+" : ""}${fmt(p)}%</span> <span style="color:var(--muted)">gün başı ${fmt(st.dayStartEquity)}</span>${st.halted ? ' <span class="dn">· FREN</span>' : ""}`;
+    $("kv").innerHTML = [["açık pozisyon", Object.keys(st.positions).length], ["bekleyen", Object.keys(st.pending).length], ["işlem / gün", `${st.tradesToday} / 10`], ["kapanan", st.closed.length], ["tarama", d.counts.scan], ["kapı kapalı", d.counts.gate], ["LLM kararı", d.counts.llm], ["ret", d.counts.reject], ["hata", d.counts.error]].map(([k, v]) => `<div>${k}</div><div>${v}</div>`).join("");
+    const pos = Object.values(st.positions);
+    $("positions").innerHTML = pos.length ? pos.map((p) => `<div class="pos"><b>${p.instId}</b> ${p.qty} @ ${p.entry}<br>hedef ${p.target} · SL ${p.sl}<div class="sub">${esc(p.reason)}</div></div>`).join("") : '<span class="empty">nakitteyim</span>';
+    const pen = Object.values(st.pending);
+    $("pending").innerHTML = pen.length ? pen.map((p) => `<div class="pos"><b>${p.instId}</b> limit ${p.sz} @ ${p.px}<div class="sub">${esc(p.reason)}</div></div>`).join("") : '<span class="empty">yok</span>';
+    const cl = [...st.closed].reverse();
+    $("closed").innerHTML = cl.length ? cl.map((c) => `<div class="pos"><b>${c.instId}</b> ${c.entry} → ${c.exit} <span class="${c.pnl >= 0 ? "up" : "dn"}">${c.pnl >= 0 ? "+" : ""}${fmt(c.pnl, 3)}</span><div class="sub">${c.why} · ${tr(c.ts)}</div></div>`).join("") : '<span class="empty">yok</span>';
+  }
+  if (m) {
+    $("gate").textContent = m.lastGate || "henüz tarama yok";
+    $("gate").className = "gate " + (/AÇIK/.test(m.lastGate || "") ? "open" : /KAPALI/.test(m.lastGate || "") ? "closed" : "");
+    $("scan").textContent = m.lastScan || "—";
+    $("llm").innerHTML = m.lastLlm ? `<div class="h">${esc(m.lastLlm.split("\n")[0])}</div>${esc(m.lastLlm.split("\n").slice(1).join("\n")) || '<span class="empty">seçim yok</span>'}` : '<span class="empty">henüz aday oluşmadı</span>';
+    const tools = Object.entries(m.byTool || {}).sort((a, b) => b[1] - a[1]); const mx = tools[0]?.[1] || 1;
+    $("tools").innerHTML = tools.map(([k, v]) => `<div>${k}<div class="bar"><i style="width:${(v / mx) * 100}%"></i></div></div><div>${v}</div>`).join("") || '<span class="empty">—</span>';
+  }
+  $("anchors").innerHTML = d.anchors.length ? d.anchors.map((a) => `<div class="anchor">#${a.seq} · ${a.n} karar · ${tr(a.ts)}<br><a href="https://www.oklink.com/xlayer-test/tx/${a.txHash}" target="_blank">${a.txHash.slice(0, 14)}…</a></div>`).join("") : '<span class="empty">henüz kayıt yok</span>';
+  $("stream").innerHTML = d.journal.map((e) => `<div class="row kind-${e.kind}"><div class="t">${tr(e.ts)}</div><div class="r ${e.role}">${e.role}</div><div class="m">${esc(e.msg)}${e.data?.reason ? `<span class="d">${esc(e.data.reason)}</span>` : ""}${e.data?.picks?.length ? `<span class="d">${esc(e.data.picks.join("\n"))}</span>` : ""}${e.data?.rejects?.length ? `<span class="d">${esc(e.data.rejects.join("\n"))}</span>` : ""}</div></div>`).join("");
+  spark(d.snaps);
+}
+refresh(); setInterval(refresh, 4000);
+</script>
+</body>
+</html>
