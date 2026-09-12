@@ -22,7 +22,8 @@
   header .mode.live { border-color:var(--acc); color:var(--acc); }
   header .spacer { flex:1; }
   header .clock { font-family:"JetBrains Mono"; color:var(--muted); }
-  .rail, .aux { border-right:1px solid var(--line); overflow:auto; padding:20px; }
+  .rail, .aux { border-right:1px solid var(--line); overflow:auto; padding:20px; min-width:0; }
+  .grid > * { min-width:0; }
   .aux { border-right:0; border-left:1px solid var(--line); }
   .main { overflow:auto; padding:20px 28px; }
   .label { font-family:"JetBrains Mono"; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin:22px 0 8px; }
@@ -48,7 +49,8 @@
   .row.kind-llm .m { color:var(--ink); }
   .pos { padding:10px 0; border-bottom:1px solid var(--line); font-family:"JetBrains Mono"; font-size:12.5px; }
   .pos b { font-weight:700; } .pos .sub { color:var(--muted); font-size:12px; margin-top:3px; font-family:"Instrument Sans"; }
-  .tools { display:grid; grid-template-columns:1fr auto; gap:3px 10px; font-family:"JetBrains Mono"; font-size:11.5px; color:var(--muted); }
+  .tools { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:3px 10px; font-family:"JetBrains Mono"; font-size:11.5px; color:var(--muted); }
+  .tools .n { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .tools div:nth-child(even) { text-align:right; color:var(--ink); }
   .bar { height:3px; background:var(--line); margin-top:2px; } .bar i { display:block; height:3px; background:var(--acc); }
   .anchor a { color:var(--ink); text-decoration:none; border-bottom:1px solid var(--line); }
@@ -132,7 +134,7 @@ async function refresh() {
   if (st) {
     $("eq").innerHTML = `${fmt(st.equity)}<small>USDT</small>`;
     const p = st.dayStartEquity ? (st.equity / st.dayStartEquity - 1) * 100 : 0;
-    $("delta").innerHTML = `<span class="${p >= 0 ? "up" : "dn"}">${p >= 0 ? "+" : ""}${fmt(p)}%</span> <span style="color:var(--muted)">gün başı ${fmt(st.dayStartEquity)}</span>${st.halted ? ' <span class="dn">· FREN</span>' : ""}`;
+    $("delta").innerHTML = `<span class="${Math.abs(p) < 0.005 ? "" : p > 0 ? "up" : "dn"}">${p > 0 ? "+" : ""}${fmt(Math.abs(p) < 0.005 ? 0 : p)}%</span> <span style="color:var(--muted)">gün başı ${fmt(st.dayStartEquity)}</span>${st.halted ? ' <span class="dn">· FREN</span>' : ""}`;
     $("kv").innerHTML = [["açık pozisyon", Object.keys(st.positions).length], ["bekleyen", Object.keys(st.pending).length], ["işlem / gün", `${st.tradesToday} / 10`], ["kapanan", st.closed.length], ["tarama", d.counts.scan], ["kapı kapalı", d.counts.gate], ["LLM kararı", d.counts.llm], ["ret", d.counts.reject], ["hata", d.counts.error]].map(([k, v]) => `<div>${k}</div><div>${v}</div>`).join("");
     const pos = Object.values(st.positions);
     $("positions").innerHTML = pos.length ? pos.map((p) => `<div class="pos"><b>${p.instId}</b> ${p.qty} @ ${p.entry}<br>hedef ${p.target} · SL ${p.sl}<div class="sub">${esc(p.reason)}</div></div>`).join("") : '<span class="empty">nakitteyim</span>';
@@ -147,7 +149,7 @@ async function refresh() {
     $("scan").textContent = m.lastScan || "—";
     $("llm").innerHTML = m.lastLlm ? `<div class="h">${esc(m.lastLlm.split("\n")[0])}</div>${esc(m.lastLlm.split("\n").slice(1).join("\n")) || '<span class="empty">seçim yok</span>'}` : '<span class="empty">henüz aday oluşmadı</span>';
     const tools = Object.entries(m.byTool || {}).sort((a, b) => b[1] - a[1]); const mx = tools[0]?.[1] || 1;
-    $("tools").innerHTML = tools.map(([k, v]) => `<div>${k}<div class="bar"><i style="width:${(v / mx) * 100}%"></i></div></div><div>${v}</div>`).join("") || '<span class="empty">—</span>';
+    $("tools").innerHTML = tools.map(([k, v]) => `<div><div class="n" title="${k}">${k.replace(/^(market|account|spot|news|smartmoney)_/, "$1 · ")}</div><div class="bar"><i style="width:${(v / mx) * 100}%"></i></div></div><div>${v}</div>`).join("") || '<span class="empty">—</span>';
   }
   $("anchors").innerHTML = d.anchors.length ? d.anchors.map((a) => `<div class="anchor">#${a.seq} · ${a.n} karar · ${tr(a.ts)}<br><a href="https://www.oklink.com/xlayer-test/tx/${a.txHash}" target="_blank">${a.txHash.slice(0, 14)}…</a></div>`).join("") : '<span class="empty">henüz kayıt yok</span>';
   $("stream").innerHTML = d.journal.map((e) => `<div class="row kind-${e.kind}"><div class="t">${tr(e.ts)}</div><div class="r ${e.role}">${e.role}</div><div class="m">${esc(e.msg)}${e.data?.reason ? `<span class="d">${esc(e.data.reason)}</span>` : ""}${e.data?.picks?.length ? `<span class="d">${esc(e.data.picks.join("\n"))}</span>` : ""}${e.data?.rejects?.length ? `<span class="d">${esc(e.data.rejects.join("\n"))}</span>` : ""}</div></div>`).join("");

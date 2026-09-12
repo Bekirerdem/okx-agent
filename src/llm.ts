@@ -95,3 +95,16 @@ export async function decide(cands: Candidate[], freeSlots: number, ctx: { btcRe
   }
   return byRule(cands, freeSlots, "tüm sağlayıcılar düştü");
 }
+
+/** Serbest soru: sahibi Telegram'dan sorar, Seçici günlük bağlamıyla kısa Türkçe cevap verir. */
+export async function ask(question: string, context: string): Promise<string> {
+  const p = `Sen "okx-agent" adlı spot trading ajanının Seçici katmanısın. Sahibin Telegram'dan soru soruyor. Aşağıdaki durum ve günlük bağlamına dayanarak, en fazla 6 cümle, Türkçe, somut ve dürüst cevap ver. Bilmediğini uydurma; günlükte yoksa "günlükte yok" de. Boyut/stop/kapı/fren kuralları koddadır, onları değiştiremezsin; sorulursa bunu söyle.
+${context}
+
+SORU: ${question}`;
+  const order = CFG.llm.provider === "gemini" ? [viaGemini, viaClaude] : [viaClaude, viaGemini];
+  for (const fn of order) {
+    try { const r = (await fn(p)).trim(); if (r) return r; } catch (e) { console.error("ask:", (e as Error).message?.slice(0, 120)); }
+  }
+  return "Şu an LLM'e ulaşamıyorum; /durum, /pozisyon ve /adaylar komutları kural motorundan cevap verir.";
+}

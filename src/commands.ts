@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { CFG } from "./config";
 import { telegram, log } from "./journal";
 import { anchorStatus } from "./anchor";
+import { ask } from "./llm";
 
 export type CmdCtx = {
   snapshot: () => { equity: number; dayStart: number; halted: boolean; trades: number; positions: any[]; pending: any[]; mcpCalls: number; mcpErrors: number; lastScan: string; lastGate: string; lastLlm: string };
@@ -78,8 +79,21 @@ export function startCommandLoop(ctx: CmdCtx): void {
         offset = u.update_id + 1;
         const m = u.message; if (!m?.text) continue;
         if (String(m.chat?.id) !== TG.chat) continue;           // yalnız sahibi
-        if (!m.text.startsWith("/")) continue;
-        try { await telegram(await handle(m.text, ctx)); log("info", `komut: ${m.text}`); }
+        try {
+          if (m.text.startsWith("/")) { await telegram(await handle(m.text, ctx)); log("info", `komut: ${m.text}`); }
+          else {
+            const s = ctx.snapshot();
+            const recent = journalLines().slice(-40).map((e) => `${e.ts.slice(11, 19)}Z ${e.role}·${e.kind}: ${e.msg}${e.data?.reason ? " → " + e.data.reason : ""}`).join("
+");
+            const context = `DURUM: özkaynak ${s.equity.toFixed(2)} USDT, gün başı ${s.dayStart.toFixed(2)}, açık ${s.positions.length}, bekleyen ${s.pending.length}, işlem ${s.trades}, fren ${s.halted ? "aktif" : "yok"}.
+${s.lastGate}
+SON TARAMA: ${s.lastScan}
+SEÇİCİ: ${s.lastLlm}
+SON GÜNLÜK:
+${recent}`;
+            await telegram(await ask(m.text, context)); log("info", `soru: ${m.text}`);
+          }
+        }
         catch (e) { await telegram(`hata: ${(e as Error).message?.slice(0, 200)}`); }
       }
     } catch { /* ağ; tekrar dene */ }
