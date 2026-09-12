@@ -51,7 +51,7 @@ Beş rol, iki ritim. Her günlük satırı hangi rolün konuştuğunu söyler.
 
 | Rol | Modül | Sorumluluk |
 |---|---|---|
-| Tarayıcı | `market.ts`, `signals.ts` | İzleme listesi, mumlar, BTC filtresi, dip avı tespiti, göreli güç, defter dengesi |
+| Tarayıcı | `market.ts`, `signals.ts` | İzleme listesi, mumlar, BTC filtresi, dip avı tespiti, göreli güç, defter dengesi, teknik bağlam (RSI 14, EMA 20/50 trendi, ATR, VWAP uzaklığı, hacim oranı) |
 | Karar | `llm.ts` | Adayları zenginleştirilmiş bağlamla gerekçelendirir; `claude -p` → Gemini → kural motoru |
 | Risk | `risk.ts` | Pozisyon boyutu, tavanlar, günlük fren, lot ve fiyat yuvarlama. Saf fonksiyonlar, birim testli |
 | Emir | `exchange.ts` | Limit alış + ekli stop, zaman aşımı iptali, hedefte satış, algo iptali. `--dry-run` hiç emir göndermez |
