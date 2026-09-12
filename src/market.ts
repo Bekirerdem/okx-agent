@@ -86,13 +86,19 @@ export async function getSmartMoney(atk: Atk): Promise<Map<string, { longRatio: 
   return m;
 }
 
+/** OKX news yanıtları {details:[...]} zarfında gelir; diziye indirger. */
+function newsRows(r: any): any[] {
+  const o = Array.isArray(r) ? (r[0]?.details ? r[0] : { details: r }) : r;
+  return Array.isArray(o?.details) ? o.details : Array.isArray(o) ? o : [];
+}
+
 /** Son 6 saatin yüksek önemli haber başlıkları. Hata olursa boş. */
 export async function getNews(atk: Atk, coin: string): Promise<string[]> {
   try {
     const rows: any[] = await atk.call("news_get_by_coin", {
-      coins: coin, importance: "high", language: "en-US", limit: 5, detailLvl: "brief", begin: Date.now() - 6 * 3600_000,
+      coins: coin, importance: "low", language: "en-US", limit: 5, begin: Date.now() - 6 * 3600_000,   // low = tümü (son 6 saat)
     });
-    return (rows ?? []).map((r) => String(r.title ?? r.headline ?? "")).filter(Boolean);
+    return newsRows(rows).map((r) => String(r.title ?? r.summary ?? "")).filter(Boolean);
   } catch { return []; }
 }
 
@@ -100,18 +106,17 @@ export async function getNews(atk: Atk, coin: string): Promise<string[]> {
 export async function getSentiment(atk: Atk, coin: string): Promise<{ score: number; label: string } | null> {
   try {
     const rows: any = await atk.call("news_get_coin_sentiment", { coins: coin, period: "24h" });
-    const r = Array.isArray(rows) ? rows[0] : rows;
-    if (!r) return null;
-    const score = Number(r.score ?? r.sentimentScore ?? r.sentiment ?? NaN);
-    const label = String(r.label ?? r.sentimentLabel ?? (score > 0.2 ? "bullish" : score < -0.2 ? "bearish" : "neutral"));
-    return isNaN(score) ? { score: 0, label } : { score, label };
+    const d = newsRows(rows)[0];
+    if (!d?.sentiment) return null;
+    const bull = Number(d.sentiment.bullishRatio ?? 0), bear = Number(d.sentiment.bearishRatio ?? 0);
+    return { score: Number((bull - bear).toFixed(2)), label: `${d.sentiment.label} (bull ${bull}, bear ${bear}, ${d.mentionCnt ?? "?"} mention)` };
   } catch { return null; }
 }
 
 /** Son 3 saatin yüksek önemli piyasa haberleri (saat başı rejim notu için). */
 export async function getImportantNews(atk: Atk, limit = 5): Promise<string[]> {
   try {
-    const rows: any[] = await atk.call("news_get_important", { limit, language: "en-US", begin: Date.now() - 3 * 3600_000 });
-    return (rows ?? []).map((r) => String(r.title ?? "")).filter(Boolean);
+    const rows: any[] = await atk.call("news_get_latest", { limit, language: "en-US", importance: "high" });
+    return newsRows(rows).map((r) => String(r.title ?? r.summary ?? "")).filter(Boolean);
   } catch { return []; }
 }
