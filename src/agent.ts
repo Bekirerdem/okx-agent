@@ -5,7 +5,7 @@ import { Atk } from "./mcp";
 import { getUniverse, getInstruments, getCandles, getLast, getBook, getSmartMoney, getNews, getSentiment, getImportantNews, getFreshCoinNews, type Inst, type Ticker } from "./market";
 import { detectSweep, relStrength, btcGate, dayRangePct, targetPrice, bookImbalance, technicalContext, type Bar } from "./signals";
 import { positionNotional, canOpen, dailyStopHit, stopPrice, roundSize, roundPrice } from "./risk";
-import { getBalance, placeLimitBuy, getOrder, cancelOrder, sellMarket } from "./exchange";
+import { getBalance, placeLimitBuy, getOrder, cancelOrder, sellMarket, placeOco, lastSellFill } from "./exchange";
 import { decide, ask, type Candidate } from "./llm";
 import { log, trTime } from "./journal";
 import { flush as anchorFlush, anchorStatus, anchorAddress, pendingCount, lastFlushTs } from "./anchor";
@@ -13,7 +13,7 @@ import { startCommandLoop, getMode, askApproval } from "./commands";
 import { buildReport } from "./report";
 import { emptyShadow, stepShadow, flattenShadow, shadowSummary, type ShadowState } from "./shadow";
 
-type Position = { instId: string; qty: number; entry: number; target: number; sl: number; openedTs: number; openedBucket: number; reason: string };
+type Position = { instId: string; qty: number; entry: number; target: number; sl: number; openedTs: number; openedBucket: number; reason: string; oco?: boolean };
 type Pending = { instId: string; ordId: string; px: number; sz: number; target: number; sl: number; ts: number; reason: string };
 type State = {
   day: string; dayStartEquity: number; equity: number; halted: boolean; tradesToday: number;
@@ -123,11 +123,11 @@ async function main() {
           const entry = o.avgPx || p.px;
           const base = id.split("-")[0]!;
           const qty = (o.accFillSz || p.sz) + (o.feeCcy === base ? o.fee : 0);   // OKX alış komisyonunu coin cinsinden keser (fee negatif)
-          st.positions[id] = { instId: id, qty, entry, target: targetPrice(entry, p.target, CFG.exit.targetMinPct), sl: p.sl, openedTs: Date.now(), openedBucket: Math.floor(Date.now() / BAR_MS), reason: p.reason };
+          st.positions[id] = { instId: id, qty, entry, target: targetPrice(entry, p.target, CFG.exit.targetMinPct), sl: p.sl, openedTs: Date.now(), openedBucket: Math.floor(Date.now() / BAR_MS), reason: p.reason, oco: true };
           delete st.pending[id];
           const tgt = st.positions[id]!.target;
-          log("fill", `${id} alındı · ${qty} adet @${entry} · hedef ${tgt.toFixed(4)} (${pctOf(tgt, entry)}) · stop ${p.sl} borsada`, { reason: p.reason,
-            tg: `<b>ALIŞ DOLDU · ${id}</b>${String.fromCharCode(10)}${qty.toFixed(4)} adet @ ${entry} (${(qty * entry).toFixed(2)} USDT)${String.fromCharCode(10)}Hedef ${tgt.toFixed(4)} (${pctOf(tgt, entry)}) · stop ${p.sl} (${pctOf(p.sl, entry)}, borsada)${String.fromCharCode(10)}<i>${H(p.reason)}</i>` });
+          log("fill", `${id} alındı · ${qty} adet @${entry} · hedef ${tgt.toFixed(4)} (${pctOf(tgt, entry)}) ve stop ${p.sl} borsada (OCO)`, { reason: p.reason,
+            tg: `<b>ALIŞ DOLDU · ${id}</b>${String.fromCharCode(10)}${qty.toFixed(4)} adet @ ${entry} (${(qty * entry).toFixed(2)} USDT)${String.fromCharCode(10)}Hedef ${tgt.toFixed(4)} (${pctOf(tgt, entry)}) · stop ${p.sl} (${pctOf(p.sl, entry)}) · ikisi de borsada${String.fromCharCode(10)}<i>${H(p.reason)}</i>` });
         } else if (o.state === "canceled" || Date.now() - p.ts > CFG.exit.orderTimeoutSec * 1000) {
           if (o.state !== "canceled") { try { await cancelOrder(atk, id, p.ordId); } catch { /* */ } }
           delete st.pending[id];
@@ -138,10 +138,23 @@ async function main() {
       for (const [id, p] of Object.entries(st.positions)) {
         const have = b.coins[id.split("-")[0]!];
         if (!CFG.dryRun && have !== undefined && have < p.qty * 0.5) {
-          st.closed.push({ instId: id, entry: p.entry, exit: p.sl, qty: p.qty, pnl: (p.sl - p.entry) * p.qty, why: "SL", ts: Date.now() });
+          // borsa tarafında kapanmış: hedef mi stop mu? gerçek satış fill'inden oku
+          const f = await lastSellFill(atk, id, p.openedTs - 60_000);
+          const exitPx = f?.avgPx ?? (await getLast(atk, id).catch(() => p.sl));
+          const hitTp = exitPx >= (p.entry + p.target) / 2;
+          const pnl = f ? f.qty * f.avgPx - p.qty * p.entry - f.feeUsdt : (exitPx - p.entry) * p.qty;
+          st.closed.push({ instId: id, entry: p.entry, exit: exitPx, qty: p.qty, pnl, why: hitTp ? "hedef (borsada)" : "SL", ts: Date.now() });
           st.cooldown[id] = Math.floor(Date.now() / BAR_MS); delete st.positions[id];
-          log("stop", `${id} stop oldu · borsa stopu ~@${p.sl} tetiklendi (${pctOf(p.sl, p.entry)})`, { entry: p.entry,
-            tg: `<b>STOP · ${id}</b>${String.fromCharCode(10)}Giriş ${p.entry} → stop ${p.sl} (${pctOf(p.sl, p.entry)}) · borsa tarafında kapandı${String.fromCharCode(10)}Kasa ${st.equity.toFixed(2)} (${dayPct()})` }); continue;
+          log(hitTp ? "exit" : "stop", `${id} ${hitTp ? "hedefe ulaştı" : "stop oldu"} · borsa tarafında @${exitPx} (${pctOf(exitPx, p.entry)}) · sonuç ${pnl >= 0 ? "+" : ""}${pnl.toFixed(3)} USDT`, { entry: p.entry,
+            tg: `<b>${hitTp ? "HEDEFE ULAŞTI" : "STOP"} · ${id}</b> · borsa tarafında${String.fromCharCode(10)}Giriş ${p.entry} → çıkış ${exitPx} (${pctOf(exitPx, p.entry)})${String.fromCharCode(10)}Sonuç ${pnl >= 0 ? "+" : ""}${pnl.toFixed(3)} USDT · kasa ${st.equity.toFixed(2)} (${dayPct()})` }); continue;
+        }
+        if (!p.oco && !CFG.dryRun) {   // eski pozisyon: hedefi de borsaya taşı (OCO)
+          try {
+            const i = inst.get(id); const sz = roundSize(have ?? p.qty, i?.lotSz ?? 0, 0);
+            await placeOco(atk, id, String(sz), String(roundPrice(p.target, i?.tickSz ?? 0)), String(p.sl));
+            p.oco = true; saveState(st);
+            log("info", `${id}: hedef ${p.target.toFixed(4)} ve stop ${p.sl} borsaya OCO olarak taşındı; ajan kör kalsa bile çıkış gerçekleşir`, { tg: `<b>${id}</b> · hedef ve stop artık borsada (OCO)` });
+          } catch (e) { log("error", `${id} OCO: ${(e as Error).message?.slice(0, 160)}`); }
         }
         const px = await getLast(atk, id);
         if (px >= p.target) await closePosition(id, p, "hedef");
@@ -310,7 +323,7 @@ ${journal}`);
         if (!ok) { log("reject", `${c.instId}: sahibi onaylamadı ya da süre doldu (onaylı mod)`); continue; }
       }
       try {
-        const ordId = await placeLimitBuy(atk, { instId: c.instId, px: String(px), sz: String(sz), slPx: String(sl), clOrdId: `ag${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`.slice(0, 32) });
+        const ordId = await placeLimitBuy(atk, { instId: c.instId, px: String(px), sz: String(sz), slPx: String(sl), tpPx: String(roundPrice(targetPrice(px, c.mid, CFG.exit.targetMinPct), i.tickSz)), clOrdId: `ag${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`.slice(0, 32) });
         st.pending[c.instId] = { instId: c.instId, ordId, px, sz, target: c.mid, sl, ts: Date.now(), reason: (c.source === "haber" ? `[haber: ${c.headline?.slice(0, 80)}] ` : "") + pick.reason };
         st.tradesToday++; if (c.source === "haber") st.newsTradesToday = (st.newsTradesToday ?? 0) + 1;
         const tgt = targetPrice(px, c.mid, CFG.exit.targetMinPct);
