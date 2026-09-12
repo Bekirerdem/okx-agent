@@ -9,6 +9,8 @@ import { getBalance, placeLimitBuy, getOrder, cancelOrder, sellMarket } from "./
 import { decide, type Candidate } from "./llm";
 import { log, trTime } from "./journal";
 import { flush as anchorFlush, anchorStatus, anchorAddress } from "./anchor";
+import { startCommandLoop } from "./commands";
+import { buildReport } from "./report";
 
 type Position = { instId: string; qty: number; entry: number; target: number; sl: number; openedTs: number; openedBucket: number; reason: string };
 type Pending = { instId: string; ordId: string; px: number; sz: number; target: number; sl: number; ts: number; reason: string };
@@ -51,6 +53,7 @@ async function main() {
   let universe: Ticker[] = await getUniverse(atk);
   let universeTs = Date.now();
   let smart = await getSmartMoney(atk); let smartTs = Date.now();
+  const last = { scan: "", gate: "", llm: "" };
 
   // Uzlaştırma: borsadaki gerçek bakiye ile başla.
   const bal = await getBalance(atk);
@@ -174,6 +177,8 @@ async function main() {
       }
     }));
     raw.sort((a, b) => b.sweep.depthPct - a.sweep.depthPct);
+    last.scan = `${hm}: ${raw.length} aday: ${raw.map((r) => `${r.t.instId} (derinlik ${r.sweep.depthPct.toFixed(2)}%)`).join(", ") || "yok"}`;
+    last.gate = `Kapı ${gate.open ? "AÇIK" : "KAPALI"} — BTC 4h ${gate.retPct.toFixed(2)}% (${hm})`;
     log("scan", `${hm}: BTC 4h ${gate.retPct.toFixed(2)}% → kapı ${gate.open ? "AÇIK" : "KAPALI"} | ${universe.length} parite tarandı | ${raw.length} süpürme adayı${skipped.length ? " | elenen " + skipped.length : ""}`,
       { candidates: raw.map((r) => `${r.t.instId} d${r.sweep.depthPct.toFixed(2)}`), skipped: skipped.slice(0, 12) });
 
@@ -192,6 +197,8 @@ async function main() {
     }));
 
     const d = await decide(cands, freeSlots, { btcRetPct: gate.retPct, equity: st.equity, tr: hm });
+    last.llm = [`Seçici (${d.provider}): ${d.note}`, ...d.picks.map((p) => `✅ ${p.instId}: ${p.reason}`), ...d.rejects.map((p) => `⛔ ${p.instId}: ${p.reason}`)].join("
+");
     log("llm", `${d.provider}: ${d.picks.length} seçim, ${d.rejects.length} ret. ${d.note}`, {
       picks: d.picks.map((p) => `${p.instId}: ${p.reason}`), rejects: d.rejects.map((p) => `${p.instId}: ${p.reason}`),
     });
@@ -214,6 +221,14 @@ async function main() {
     }
     saveState(st);
   }
+
+  startCommandLoop({
+    snapshot: () => ({ equity: st.equity, dayStart: st.dayStartEquity, halted: st.halted, trades: st.tradesToday, positions: Object.values(st.positions), pending: Object.values(st.pending), mcpCalls: atk.calls, mcpErrors: atk.errors, lastScan: last.scan, lastGate: last.gate, lastLlm: last.llm }),
+    lastPrice: (id) => getLast(atk, id),
+    halt: async (why) => { st.halted = true; await flattenAll(why); saveState(st); log("halt", `MANUEL FREN (${why}): pozisyonlar kapatıldı, yeni işlem yok.`); },
+    resume: () => { st.halted = false; saveState(st); log("info", "fren kaldırıldı (Telegram /devam)"); },
+    report: () => buildReport(),
+  });
 
   process.on("SIGINT", async () => { log("info", "kapatılıyor, durum kaydedildi (pozisyonlar ve borsa SL'leri duruyor)"); saveState(st); await atk.close(); process.exit(0); });
 

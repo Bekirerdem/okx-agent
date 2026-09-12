@@ -3,6 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { CFG } from "./config";
 
 type J = { ts: string; kind: string; msg: string; data?: any };
+export function buildReport(): string {
 const lines: J[] = existsSync(CFG.paths.journal) ? readFileSync(CFG.paths.journal, "utf-8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)) : [];
 const st = existsSync(CFG.paths.state) ? JSON.parse(readFileSync(CFG.paths.state, "utf-8")) : null;
 
@@ -41,4 +42,6 @@ ${closed.length ? closed.map((c) => `- ${c.instId}: ${c.qty} @${c.entry} → ${c
 ${snaps.map((s) => `- ${s.ts.slice(11, 16)}Z ${s.eq.toFixed(2)}`).join("\n")}
 `;
 writeFileSync("state/report.md", md);
-console.log(md);
+return md;
+}
+if (import.meta.main) console.log(buildReport());
