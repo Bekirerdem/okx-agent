@@ -241,15 +241,16 @@ function stream(d) {
   $("stream").innerHTML = vis.map(({ e, n, first }) => `<div class="row kind-${e.kind}"><div class="t">${tr(e.ts)}${n > 1 ? `<span class="n">${tr(first)}'den beri</span>` : ""}</div><div class="k">${KIND[e.kind] || e.kind}</div><div class="m">${esc(e.msg).replace(/https?:\/\/\S+/g, (u) => `<a href="${u}" target="_blank" style="color:inherit">zincirde gör</a>`)}${n > 1 ? `<span class="x">×${n}</span>` : ""}${e.data?.reason ? `<span class="d">${esc(e.data.reason)}</span>` : ""}${e.data?.picks?.length ? `<span class="d">${esc(e.data.picks.join("\n"))}</span>` : ""}${e.data?.rejects?.length ? `<span class="d">${esc(e.data.rejects.join("\n"))}</span>` : ""}</div></div>`).join("") || '<span class="empty">bu filtrede kayıt yok</span>';
 }
 
+const STATIC = !!window.__STATIC__;   // dist/index.html: veri gömülü, sunucu yok (yayinla.bat ile 5 dakikada bir yenilenir)
 async function refresh() {
-  const d = await (await fetch("/api/state", { cache: "no-store" })).json();
+  const d = STATIC ? window.__STATE__ : await (await fetch("/api/state", { cache: "no-store" })).json();
   lastD = d;
   const st = d.state, m = d.metrics, px = d.prices || {};
-  $("clock").textContent = new Date().toLocaleTimeString("tr-TR", { timeZone: "Europe/Istanbul", hour: "2-digit", minute: "2-digit" });
+  $("clock").textContent = new Date(STATIC ? d.now : Date.now()).toLocaleTimeString("tr-TR", { timeZone: "Europe/Istanbul", hour: "2-digit", minute: "2-digit" });
   $("mode").textContent = m ? (m.mode === "live" ? "canlı" : "dry-run") : "bağlı değil";
   $("mode").className = "mode" + (m?.mode === "live" ? " live" : "");
-  const hb = m ? Math.round((Date.now() - m.ts) / 1000) : null;
-  $("hdr").innerHTML = m ? `OKX TR · spot · gerçek hesap · <span class="${hb > 180 ? "dn" : ""}">nabız ${hb} sn önce${hb > 180 ? " · AJAN SESSİZ" : ""}</span>` : "";
+  const hb = m ? Math.round(((STATIC ? d.now : Date.now()) - m.ts) / 1000) : null;
+  $("hdr").innerHTML = m ? `OKX TR · spot · gerçek hesap · ${STATIC ? `anlık görüntü ${tr(d.now)} · 5 dakikada bir yenilenir` : `<span class="${hb > 180 ? "dn" : ""}">nabız ${hb} sn önce${hb > 180 ? " · AJAN SESSİZ" : ""}</span>`}` : "";
   const me = st?.dayStartEquity ? (st.equity / st.dayStartEquity - 1) * 100 : 0;
   if (st) {
     const diff = st.equity - (st.dayStartEquity || st.equity);
@@ -285,7 +286,8 @@ async function refresh() {
   stream(d);
   spark(d.snaps);
 }
-refresh(); setInterval(refresh, 4000);
+refresh(); if (!STATIC) setInterval(refresh, 4000);
+if (STATIC) { $("askq").placeholder = "soru kutusu canlı panelde çalışır (bu sayfa anlık görüntü)"; $("askq").disabled = true; $("askb").disabled = true; }
 $("chips").addEventListener("click", (ev) => {
   const b = ev.target.closest("button"); if (!b) return;
   flt = b.dataset.f; for (const x of $("chips").querySelectorAll("button")) x.classList.toggle("on", x === b);
