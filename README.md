@@ -98,9 +98,9 @@ Panel her aracın çağrı sayısını canlı gösterir. Ajan Claude Code'a da M
 ## 8. Etkileşim
 
 **Telegram** (yalnız sahibinin sohbeti):
-`/durum` · `/pozisyon` anlık kâr/zarar · `/adaylar` son tarama ve Karar'nin gerekçeleri · `/neden COIN` · `/kurallar` · `/rapor` · `/dur` · `/devam` · `/zincir`.
+`/durum` · `/pozisyon` anlık kâr/zarar · `/adaylar` son tarama ve Karar'ın gerekçeleri · `/neden COIN` · `/kurallar` · `/rapor` · `/dur` · `/devam` · `/zincir`.
 `/mod onaylı` insan-döngüde çalışır: her girişten önce ajan Telegram'dan onay ister, 60 saniyede "evet" gelmezse işlem açılmaz; `/mod otonom` kurallar içinde kendi kararıyla döner.
-Komut olmayan her mesaj Karar'ye sorudur: "sabahtan beri neden işlem açmadın" gibi. Cevap günlük bağlamından gelir, uydurma yoktur.
+Komut olmayan her mesaj Karar'a sorudur: "sabahtan beri neden işlem açmadın" gibi. Cevap günlük bağlamından gelir, uydurma yoktur.
 
 **Haber adayı:** son 45 dakikada izleme listesindeki bir coin hakkında yüksek önemli OKX haberi çıkarsa, teknik kurulum olmasa da Karar katmanına "haber" etiketiyle gider. Karar yalnızca somut ve olumlu haberde (listeleme, ortaklık, mainnet, geri alım, onay) seçebilir; fiyat zaten fırlamışsa (göreli güç > +%3) kovalama sayılır. Aynı risk kuralları, günde en fazla 1 haber işlemi. Haber ayrıca her aday için veto kaynağıdır.
 
@@ -108,7 +108,7 @@ Komut olmayan her mesaj Karar'ye sorudur: "sabahtan beri neden işlem açmadın"
 
 **Doğrulama:** `bun run verify [seq]` batch dosyasını yeniden hash'ler, X Layer'daki işlem verisiyle karşılaştırır ve "EŞLEŞTİ / EŞLEŞMEDİ" der.
 
-**Panel** (`bun run dashboard`, http://localhost:8787): kasa ve gün içi eğri, BTC filtresi durumu, sayaçlar, risk kuralları, rol etiketli karar akışı, Karar'nin son kararı, pozisyonlar, kapanan işlemler, MCP araç defteri, X Layer kayıtları. 4 saniyede bir yenilenir.
+**Panel** (`bun run dashboard`, http://localhost:8787): kasa ve gün içi eğri, BTC filtresi durumu, sayaçlar, risk kuralları, rol etiketli karar akışı, Karar'ın son kararı, pozisyonlar, kapanan işlemler, MCP araç defteri, X Layer kayıtları. 4 saniyede bir yenilenir.
 
 ## 9. Denetim izi
 
