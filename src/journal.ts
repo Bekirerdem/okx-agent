@@ -3,8 +3,13 @@ import { appendFileSync, mkdirSync } from "node:fs";
 import { CFG } from "./config";
 
 export type Kind = "boot" | "gate" | "scan" | "reject" | "llm" | "entry" | "fill" | "cancel" | "exit" | "stop" | "halt" | "flat" | "error" | "snapshot" | "info";
-export type Entry = { ts: string; kind: Kind; msg: string; data?: Record<string, unknown> };
+export type Entry = { ts: string; kind: Kind; role: string; msg: string; data?: Record<string, unknown> };
 
+// Roller: jüri her satırda hangi ajanın konuştuğunu görür.
+export const ROLE: Record<Kind, string> = {
+  boot: "Kâtip", gate: "Gözcü", scan: "Gözcü", reject: "Hakem", llm: "Seçici", entry: "İcracı", fill: "İcracı", cancel: "İcracı",
+  exit: "İcracı", stop: "Hakem", halt: "Hakem", flat: "İcracı", error: "Kâtip", snapshot: "Kâtip", info: "Kâtip",
+};
 const ICON: Record<Kind, string> = {
   boot: "🟢", gate: "🚧", scan: "🔍", reject: "⛔", llm: "🧠", entry: "🟩", fill: "✅", cancel: "↩️", exit: "🎯",
   stop: "🛑", halt: "⏸️", flat: "🏁", error: "⚠️", snapshot: "📊", info: "ℹ️",
@@ -20,8 +25,8 @@ export function trTime(d = new Date()): string {
 }
 
 export function log(kind: Kind, msg: string, data?: Record<string, unknown>): void {
-  const e: Entry = { ts: new Date().toISOString(), kind, msg, ...(data ? { data } : {}) };
-  const line = `${ICON[kind]} ${trTime()} [${kind}] ${msg}`;
+  const e: Entry = { ts: new Date().toISOString(), kind, role: ROLE[kind], msg, ...(data ? { data } : {}) };
+  const line = `${ICON[kind]} ${trTime()} ${ROLE[kind]}·${kind} │ ${msg}`;
   console.log(line);
   try {
     appendFileSync(CFG.paths.journal, JSON.stringify(e) + "\n");

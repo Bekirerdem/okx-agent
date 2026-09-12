@@ -38,6 +38,17 @@ LLM cevap vermezse kural motoru derinliğe göre seçer ve günlüğe "LLM çevr
 
 ## Mimari
 
+Beş rol, iki ritim. Her günlük satırı hangi rolün konuştuğunu söyler.
+
+| Rol | İş | Ritim |
+|---|---|---|
+| Gözcü | BTC kapısı, evren taraması, süpürme adayları | 15 dk |
+| Seçici (LLM) | adayları haber, defter, smart money ile gerekçelendirip seçer/reddeder | 15 dk |
+| Hakem | boyut, tavanlar, gün freni, stop takibi; LLM'in erişemediği kafes | her karar |
+| İcracı | limit alış + ekli stop, iptal, hedefte satış, 19:15 nakit | 60 s |
+| Kâtip | karar günlüğü: JSONL, Markdown, Telegram; gün sonu raporu | her olay |
+
+
 | Dosya | İş |
 |---|---|
 | `src/mcp.ts` | OKX Agent Trade Kit MCP istemcisi (stdio JSON-RPC). Emir ve hesap sadece buradan. |
