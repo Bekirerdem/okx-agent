@@ -13,7 +13,7 @@ type Position = { instId: string; qty: number; entry: number; target: number; sl
 type Pending = { instId: string; ordId: string; px: number; sz: number; target: number; sl: number; ts: number; reason: string };
 type State = {
   day: string; dayStartEquity: number; equity: number; halted: boolean; tradesToday: number;
-  positions: Record<string, Position>; pending: Record<string, Pending>; cooldown: Record<string, number>;
+  positions: Record<string, Position>; pending: Record<string, Pending>; cooldown: Record<string, number>; seen: Record<string, number>;
   closed: { instId: string; entry: number; exit: number; qty: number; pnl: number; why: string; ts: number }[];
   lastBucket: number;
 };
@@ -37,7 +37,7 @@ function loadState(day: string): State {
     const s: State = JSON.parse(readFileSync(CFG.paths.state, "utf-8"));
     if (s.day === day) return s;
   }
-  return { day, dayStartEquity: 0, equity: 0, halted: false, tradesToday: 0, positions: {}, pending: {}, cooldown: {}, closed: [], lastBucket: 0 };
+  return { day, dayStartEquity: 0, equity: 0, halted: false, tradesToday: 0, positions: {}, pending: {}, cooldown: {}, seen: {}, closed: [], lastBucket: 0 };
 }
 function saveState(s: State) { mkdirSync("state", { recursive: true }); writeFileSync(CFG.paths.state, JSON.stringify(s, null, 1)); }
 
@@ -123,7 +123,7 @@ async function main() {
       }
       // mum kapanışı
       const bucket = Math.floor(Date.now() / BAR_MS);
-      if (bucket > st.lastBucket && Date.now() - bucket * BAR_MS > 8_000) {
+      if (bucket > st.lastBucket && Date.now() - bucket * BAR_MS > 20_000) {
         st.lastBucket = bucket; saveState(st);
         if (minutes >= toMin(CFG.session.start) && minutes < toMin(CFG.session.flat)) await onBarClose();
         else log("info", `${hm}: seans dışı, sadece izleme`);
@@ -159,6 +159,9 @@ async function main() {
           const bars = await getCandles(atk, t.instId, 40);
           const sweep = detectSweep(bars, CFG.entry.lookback, CFG.entry.minDepthPct);
           if (!sweep) continue;
+          const sigTs = bars[bars.length - 1]!.ts;
+          if (st.seen[t.instId] === sigTs) continue;   // aynı mum ikinci kez değerlendirilmez
+          st.seen[t.instId] = sigTs;
           const rs = relStrength(bars, btc, CFG.entry.rsBars);
           if (rs > CFG.entry.maxRs4hPct) { skipped.push(`${t.instId} (RS ${rs.toFixed(1)}% kovalama)`); continue; }
           if ((st.cooldown[t.instId] ?? -999) > bucket - CFG.risk.cooldownBars) { skipped.push(`${t.instId} (cooldown)`); continue; }

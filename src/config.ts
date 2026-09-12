@@ -27,5 +27,7 @@ export const CFG = {
   exit: { targetMinPct: 0.3, orderTimeoutSec: 120 },
   llm: { provider: process.env.LLM_PROVIDER ?? "claude", timeoutMs: 75_000 },
   tickMs: 60_000,
-  paths: { state: "state/state.json", journal: "state/journal.jsonl", md: "state/journal.md" },
+  paths: process.argv.includes("--dry-run")
+    ? { state: "state/state.dry.json", journal: "state/journal.dry.jsonl", md: "state/journal.dry.md" }
+    : { state: "state/state.json", journal: "state/journal.jsonl", md: "state/journal.md" },
 } as const;
