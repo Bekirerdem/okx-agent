@@ -99,7 +99,12 @@ Panel her aracın çağrı sayısını canlı gösterir. Ajan Claude Code'a da M
 
 **Telegram** (yalnız sahibinin sohbeti):
 `/durum` · `/pozisyon` anlık kâr/zarar · `/adaylar` son tarama ve Seçici'nin gerekçeleri · `/neden COIN` · `/kurallar` · `/rapor` · `/dur` · `/devam` · `/zincir`.
+`/mod onaylı` insan-döngüde çalışır: her girişten önce ajan Telegram'dan onay ister, 60 saniyede "evet" gelmezse işlem açılmaz; `/mod otonom` kafes içinde kendi kararıyla döner.
 Komut olmayan her mesaj Seçici'ye sorudur: "sabahtan beri neden işlem açmadın" gibi. Cevap günlük bağlamından gelir, uydurma yoktur.
+
+**Gölge bot:** aynı veride kırılım kovalayan naif strateji (hacimli 15 dk kırılım, TP +%2 / SL −%1 / 2 saat) emir göndermeden paralel simüle edilir. Panel ve `/durum` "kovalayan bot bugün: x%, ben: y%" karşılaştırmasını canlı gösterir; disiplinin değeri ölçülür, iddia edilmez.
+
+**Doğrulama:** `bun run verify [seq]` batch dosyasını yeniden hash'ler, X Layer'daki işlem verisiyle karşılaştırır ve "EŞLEŞTİ / EŞLEŞMEDİ" der.
 
 **Panel** (`bun run dashboard`, http://localhost:8787): özkaynak ve gün içi eğri, kapı durumu, sayaçlar, risk kafesi, rol etiketli karar akışı, Seçici'nin son kararı, pozisyonlar, kapanan işlemler, MCP araç defteri, X Layer kayıtları. 4 saniyede bir yenilenir.
 
@@ -126,7 +131,8 @@ Gereksinimler: Bun ≥ 1.3, Node ≥ 18 (ATK için), `@okx_ai/okx-trade-mcp` ve 
 
 - 26 haftalık kanıt, hafta sonu spot rejimine özgüdür; hafta içi aynı sinyal negatiftir. Ajan gün tipini bilir, kural setini buna göre taşımaz.
 - Sermaye 30 USDT; boyutlama yüzdeyle çalışır, büyüdükçe aynı kurallar geçerlidir.
-- Sırada: kırılım kovalayan gölge botla canlı karşılaştırma, insan-döngüde onaylı mod, OKX Global ve Bitget adaptörleri, gün sonu LLM post-mortem'i.
+- 19:15'te Seçici günün post-mortem'ini yazar (kaç tarama, kaç aday, neden girildi/girilmedi, kafes ne zaman devreye girdi, yarına tek ders).
+- Sırada: OKX Global ve Bitget adaptörleri (aynı sinyal ve kafes, farklı emir katmanı), çoklu gün istatistiği, onaylı modda panelden onay.
 
 ## 12. Dizin
 
