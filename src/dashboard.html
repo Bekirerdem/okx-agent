@@ -80,6 +80,10 @@
   .row.kind-llm .m { font-weight:600; }
   .row.kind-snapshot .m, .row.kind-info .m { color:var(--muted); font-size:15px; }
 
+  table.cands { width:100%; border-collapse:collapse; font-size:15px; }
+  table.cands th { font-family:"JetBrains Mono"; font-size:12px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); text-align:left; padding:6px 10px 8px 0; border-bottom:2px solid var(--ink); }
+  table.cands td { font-family:"JetBrains Mono"; padding:9px 10px 9px 0; border-bottom:1px solid var(--line); white-space:nowrap; }
+  table.cands td:first-child { font-weight:800; }
   .pos { padding:12px 0; border-bottom:1px solid var(--line); font-size:15px; }
   .pos b { font-family:"JetBrains Mono"; font-size:17px; font-weight:800; }
   .pos .n { font-family:"JetBrains Mono"; }
@@ -135,6 +139,9 @@
     <div class="label">Seçici'nin son kararı</div>
     <div class="llm" id="llm"><span class="empty">henüz aday oluşmadı</span></div>
 
+    <div class="label">Son adaylar · Gözcü'nün Seçici'ye verdiği bağlam</div>
+    <div id="cands"><span class="empty">henüz aday yok</span></div>
+
     <div class="label">Karar akışı · Gözcü / Seçici / Hakem / İcracı / Kâtip</div>
     <div class="stream" id="stream"></div>
   </main>
@@ -189,6 +196,8 @@ async function refresh() {
     $("gate").innerHTML = m.lastGate ? `<span class="${open ? "up" : closed ? "dn" : ""}">${open ? "AÇIK" : closed ? "KAPALI" : "—"}</span> <span class="sub">BTC 4 saatlik ${btc ? btc[1] + "%" : "—"} · ${open ? "yeni giriş serbest" : "yeni giriş yok, nakitte"}</span>` : "henüz tarama yok";
     $("scan").textContent = m.lastScan || "—";
     $("llm").innerHTML = m.lastLlm ? `<div class="h">${esc(m.lastLlm.split("\n")[0])}</div>${esc(m.lastLlm.split("\n").slice(1).join("\n")) || '<span class="empty">seçim yok</span>'}` : '<span class="empty">henüz aday oluşmadı</span>';
+    const cc = m.lastCands || [];
+    $("cands").innerHTML = cc.length ? `<table class="cands"><tr><th>parite</th><th>süpürme</th><th>gün aralığı</th><th>RS 4h</th><th>defter b/a</th><th>smart long</th><th>duygu</th><th>haber 6s</th><th>saat</th></tr>${cc.map((c) => `<tr><td>${c.instId}</td><td>${fmt(c.depth)}%</td><td>${fmt(c.range)}%</td><td class="${c.rs4h > 2 ? "dn" : ""}">${c.rs4h > 0 ? "+" : ""}${fmt(c.rs4h)}%</td><td class="${c.book > 1 ? "up" : "dn"}">${fmt(c.book)}</td><td>${c.smart === null ? "—" : fmt(c.smart)}</td><td>${esc((c.sentiment || "—").split(" (")[0])}</td><td>${c.news}</td><td>${c.hm}</td></tr>`).join("")}</table>` : '<span class="empty">henüz aday yok</span>';
     if (m.shadow) {
       const sh = m.shadow;
       $("shadow").innerHTML = `<div><div class="n ${cls(sh.pnlPct)}">${sign(sh.pnlPct)}</div><div class="k">kovalayan gölge bot · <b>${sh.trades}</b> işlem</div></div><div><div class="n ${cls(me)}">${sign(me)}</div><div class="k">ben · <b>${st ? st.closed.length : 0}</b> işlem</div></div>`;

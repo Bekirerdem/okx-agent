@@ -55,7 +55,7 @@ async function main() {
   let universe: Ticker[] = await getUniverse(atk);
   let universeTs = Date.now();
   let smart = await getSmartMoney(atk); let smartTs = Date.now();
-  const last = { scan: "", gate: "", llm: "" };
+  const last = { scan: "", gate: "", llm: "", cands: [] as Record<string, unknown>[] };
 
   // Uzlaştırma: borsadaki gerçek bakiye ile başla.
   const bal = await getBalance(atk);
@@ -157,7 +157,7 @@ ${journal}`);
       log("error", `tick: ${(e as Error).message?.slice(0, 200)}`);
     }
     saveState(st);
-    saveMetrics({ ts: Date.now(), mode: CFG.dryRun ? "dry" : "live", mcpCalls: atk.calls, mcpErrors: atk.errors, byTool: atk.byTool, lastScan: last.scan, lastGate: last.gate, lastLlm: last.llm, anchor: anchorStatus(), universe: universe.length, llm: CFG.llm.provider,
+    saveMetrics({ ts: Date.now(), mode: CFG.dryRun ? "dry" : "live", mcpCalls: atk.calls, mcpErrors: atk.errors, byTool: atk.byTool, lastScan: last.scan, lastGate: last.gate, lastLlm: last.llm, lastCands: last.cands, anchor: anchorStatus(), universe: universe.length, llm: CFG.llm.provider,
       shadow: { summary: shadowSummary(st.shadow, st.dayStartEquity), pnlPct: st.dayStartEquity ? (st.shadow.pnlUsdt / st.dayStartEquity) * 100 : 0, trades: st.shadow.trades, wins: st.shadow.wins, open: Object.values(st.shadow.open), closed: st.shadow.closed.slice(-8) } });
   }
 
@@ -222,6 +222,7 @@ ${journal}`);
       return { instId: r.t.instId, close: r.sweep.close, depthPct: r.sweep.depthPct, mid: r.sweep.mid, rs4h: r.rs, dayRangePct: r.range, volUsd: r.t.volUsd, bookImb, smart: smart.get(coin), news, sentiment };
     }));
 
+    last.cands = cands.map((c) => ({ instId: c.instId, close: c.close, depth: +c.depthPct.toFixed(2), mid: c.mid, rs4h: +c.rs4h.toFixed(2), range: +c.dayRangePct.toFixed(2), book: +c.bookImb.toFixed(2), smart: c.smart ? +c.smart.longRatio.toFixed(2) : null, sentiment: c.sentiment?.label ?? null, news: c.news.length, hm }));
     const d = await decide(cands, freeSlots, { btcRetPct: gate.retPct, equity: st.equity, tr: hm });
     last.llm = [`Seçici (${d.provider}): ${d.note}`, ...d.picks.map((p) => `✅ ${p.instId}: ${p.reason}`), ...d.rejects.map((p) => `⛔ ${p.instId}: ${p.reason}`)].join(String.fromCharCode(10));
     log("llm", `${d.provider}: ${d.picks.length} seçim, ${d.rejects.length} ret. ${d.note}`, {
