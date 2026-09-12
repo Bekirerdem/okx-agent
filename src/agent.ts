@@ -197,8 +197,7 @@ async function main() {
     }));
 
     const d = await decide(cands, freeSlots, { btcRetPct: gate.retPct, equity: st.equity, tr: hm });
-    last.llm = [`Seçici (${d.provider}): ${d.note}`, ...d.picks.map((p) => `✅ ${p.instId}: ${p.reason}`), ...d.rejects.map((p) => `⛔ ${p.instId}: ${p.reason}`)].join("
-");
+    last.llm = [`Seçici (${d.provider}): ${d.note}`, ...d.picks.map((p) => `✅ ${p.instId}: ${p.reason}`), ...d.rejects.map((p) => `⛔ ${p.instId}: ${p.reason}`)].join(String.fromCharCode(10));
     log("llm", `${d.provider}: ${d.picks.length} seçim, ${d.rejects.length} ret. ${d.note}`, {
       picks: d.picks.map((p) => `${p.instId}: ${p.reason}`), rejects: d.rejects.map((p) => `${p.instId}: ${p.reason}`),
     });
