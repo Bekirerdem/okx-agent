@@ -15,7 +15,7 @@ export const CFG = {
   },
   bar: "5m", barMin: 5,          // mum çözünürlüğü (09-12 14:45: ölü piyasada 15m → 5m; kurallar aynı, süreler mum sayısına çevrildi)
   gate: { btcBars: 48, btcMinRetPct: -1.0 },                              // 4 saat
-  entry: { lookback: 36, minDepthPct: 0.25, maxRs4hPct: 2.0, rsBars: 48 },  // 3 saatlik dip, 4 saatlik göreli güç
+  entry: { lookback: 36, minDepthPct: 0.15, maxRs4hPct: 2.0, rsBars: 48 },  // 3 saatlik dip, 4 saatlik göreli güç
   risk: {
     riskPct: 0.5,        // özkaynağın %'si, işlem başına
     slPct: 4.0,          // felaket stopu, borsada ekli
