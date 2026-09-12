@@ -113,6 +113,17 @@ export async function getSentiment(atk: Atk, coin: string): Promise<{ score: num
   } catch { return null; }
 }
 
+/** Son N dakikada çıkmış, coin etiketi olan yüksek önemli haberler (haber adayı için). */
+export async function getFreshCoinNews(atk: Atk, withinMin = 45): Promise<{ id: string; title: string; coins: string[]; ts: number }[]> {
+  try {
+    const rows: any = await atk.call("news_get_latest", { limit: 30, language: "en-US", importance: "high" });
+    const since = Date.now() - withinMin * 60_000;
+    return newsRows(rows)
+      .map((r) => ({ id: String(r.id ?? ""), title: String(r.title ?? r.summary ?? ""), coins: (r.ccyList ?? []).map((c: any) => String(c).toUpperCase()), ts: Number(r.cTime ?? 0) }))
+      .filter((n) => n.title && n.coins.length && n.ts >= since);
+  } catch { return []; }
+}
+
 /** Son 3 saatin yüksek önemli piyasa haberleri (saat başı rejim notu için). */
 export async function getImportantNews(atk: Atk, limit = 5): Promise<string[]> {
   try {

@@ -2,7 +2,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { CFG } from "./config";
 import { Atk } from "./mcp";
-import { getUniverse, getInstruments, getCandles, getLast, getBook, getSmartMoney, getNews, getSentiment, getImportantNews, type Inst, type Ticker } from "./market";
+import { getUniverse, getInstruments, getCandles, getLast, getBook, getSmartMoney, getNews, getSentiment, getImportantNews, getFreshCoinNews, type Inst, type Ticker } from "./market";
 import { detectSweep, relStrength, btcGate, dayRangePct, targetPrice, bookImbalance, technicalContext, type Bar } from "./signals";
 import { positionNotional, canOpen, dailyStopHit, stopPrice, roundSize, roundPrice } from "./risk";
 import { getBalance, placeLimitBuy, getOrder, cancelOrder, sellMarket } from "./exchange";
@@ -19,7 +19,7 @@ type State = {
   day: string; dayStartEquity: number; equity: number; halted: boolean; tradesToday: number;
   positions: Record<string, Position>; pending: Record<string, Pending>; cooldown: Record<string, number>; seen: Record<string, number>;
   closed: { instId: string; entry: number; exit: number; qty: number; pnl: number; why: string; ts: number }[];
-  lastBucket: number; postmortem?: boolean; shadow: ShadowState;
+  lastBucket: number; postmortem?: boolean; shadow: ShadowState; seenNews?: Record<string, number>; newsTradesToday?: number;
 };
 
 const BAR_MS = 15 * 60_000;
@@ -56,6 +56,13 @@ async function main() {
   let universeTs = Date.now();
   let smart = await getSmartMoney(atk); let smartTs = Date.now();
   const last = { scan: "", gate: "", llm: "", cands: [] as Record<string, unknown>[] };
+  try {   // yeniden başlatmada son tarama/karar kaybolmasın
+    const m = JSON.parse(readFileSync("state/metrics.json", "utf-8"));
+    if (m?.mode === (CFG.dryRun ? "dry" : "live")) { last.scan = m.lastScan ?? ""; last.gate = m.lastGate ?? ""; last.llm = m.lastLlm ?? ""; last.cands = m.lastCands ?? []; }
+  } catch { /* ilk çalışma */ }
+  const H = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const pctOf = (a: number, b: number) => `${a / b - 1 >= 0 ? "+" : ""}${((a / b - 1) * 100).toFixed(2)}%`;
+  const dayPct = () => (st.dayStartEquity ? `${st.equity / st.dayStartEquity - 1 >= 0 ? "+" : ""}${((st.equity / st.dayStartEquity - 1) * 100).toFixed(2)}%` : "0.00%");
 
   // Uzlaştırma: borsadaki gerçek bakiye ile başla.
   const bal = await getBalance(atk);
@@ -66,8 +73,9 @@ async function main() {
     if (have < p.qty * 0.5) { log("stop", `${id}: bakiye yok, pozisyon borsada kapanmış (SL?)`, { qty: p.qty, have }); delete st.positions[id]; }
   }
   saveState(st);
-  log("boot", `ajan ayakta | ${CFG.dryRun ? "DRY-RUN" : "CANLI"} | kasa ${st.equity.toFixed(2)} USDT | izleme listesi ${universe.length} parite | LLM ${CFG.llm.provider}`,
-    { dayStartEquity: st.dayStartEquity, positions: Object.keys(st.positions), risk: CFG.risk, anchor: anchorStatus(), anchorAddress: anchorAddress() });
+  log("boot", `ajan başladı · ${CFG.dryRun ? "dry-run" : "canlı"} · kasa ${st.equity.toFixed(2)} USDT · izleme listesi ${universe.length} parite · ${Object.keys(st.positions).length} açık pozisyon devralındı`,
+    { dayStartEquity: st.dayStartEquity, positions: Object.keys(st.positions), risk: CFG.risk, anchor: anchorStatus(), anchorAddress: anchorAddress(),
+      tg: `<b>Ajan başladı</b> · ${CFG.dryRun ? "dry-run" : "canlı"}${String.fromCharCode(10)}Kasa ${st.equity.toFixed(2)} USDT · izleme listesi ${universe.length} parite${Object.keys(st.positions).length ? `${String.fromCharCode(10)}Devralınan pozisyon: ${Object.keys(st.positions).join(", ")}` : ""}` });
 
   async function flattenAll(why: string) {
     for (const [id, p] of Object.entries(st.pending)) {
@@ -85,7 +93,9 @@ async function main() {
       st.closed.push({ instId: id, entry: p.entry, exit: px, qty: p.qty, pnl, why, ts: Date.now() });
       st.cooldown[id] = Math.floor(Date.now() / BAR_MS);
       delete st.positions[id];
-      log(why === "hedef" ? "exit" : why === "gün sonu" ? "flat" : "halt", `${id}: satıldı @${px} (${why}) pnl ${pnl >= 0 ? "+" : ""}${pnl.toFixed(3)} USDT`, { entry: p.entry, target: p.target });
+      const title = why === "hedef" ? "HEDEFE ULAŞTI" : why === "gün sonu" ? "GÜN SONU NAKİT" : "FREN SATIŞI";
+      log(why === "hedef" ? "exit" : why === "gün sonu" ? "flat" : "halt", `${id} satıldı @${px} · ${why} · sonuç ${pnl >= 0 ? "+" : ""}${pnl.toFixed(3)} USDT (${pctOf(px, p.entry)})`, { entry: p.entry, target: p.target,
+        tg: `<b>${title} · ${id}</b>${String.fromCharCode(10)}Giriş ${p.entry} → çıkış ${px} (${pctOf(px, p.entry)})${String.fromCharCode(10)}Sonuç ${pnl >= 0 ? "+" : ""}${pnl.toFixed(3)} USDT · kasa ${st.equity.toFixed(2)} (${dayPct()})` });
     } catch (e) { log("error", `${id} satış başarısız: ${(e as Error).message}`); }
   }
 
@@ -104,7 +114,9 @@ async function main() {
           const qty = (o.accFillSz || p.sz) + (o.feeCcy === base ? o.fee : 0);   // OKX alış komisyonunu coin cinsinden keser (fee negatif)
           st.positions[id] = { instId: id, qty, entry, target: targetPrice(entry, p.target, CFG.exit.targetMinPct), sl: p.sl, openedTs: Date.now(), openedBucket: Math.floor(Date.now() / BAR_MS), reason: p.reason };
           delete st.pending[id];
-          log("fill", `${id}: alındı ${qty} @${entry} | hedef ${st.positions[id]!.target.toFixed(6)} | SL ${p.sl} (borsada)`, { reason: p.reason });
+          const tgt = st.positions[id]!.target;
+          log("fill", `${id} alındı · ${qty} adet @${entry} · hedef ${tgt.toFixed(4)} (${pctOf(tgt, entry)}) · stop ${p.sl} borsada`, { reason: p.reason,
+            tg: `<b>ALIŞ DOLDU · ${id}</b>${String.fromCharCode(10)}${qty.toFixed(4)} adet @ ${entry} (${(qty * entry).toFixed(2)} USDT)${String.fromCharCode(10)}Hedef ${tgt.toFixed(4)} (${pctOf(tgt, entry)}) · stop ${p.sl} (${pctOf(p.sl, entry)}, borsada)${String.fromCharCode(10)}<i>${H(p.reason)}</i>` });
         } else if (o.state === "canceled" || Date.now() - p.ts > CFG.exit.orderTimeoutSec * 1000) {
           if (o.state !== "canceled") { try { await cancelOrder(atk, id, p.ordId); } catch { /* */ } }
           delete st.pending[id];
@@ -117,7 +129,8 @@ async function main() {
         if (!CFG.dryRun && have !== undefined && have < p.qty * 0.5) {
           st.closed.push({ instId: id, entry: p.entry, exit: p.sl, qty: p.qty, pnl: (p.sl - p.entry) * p.qty, why: "SL", ts: Date.now() });
           st.cooldown[id] = Math.floor(Date.now() / BAR_MS); delete st.positions[id];
-          log("stop", `${id}: borsa stopu tetiklendi (~@${p.sl})`, { entry: p.entry }); continue;
+          log("stop", `${id} stop oldu · borsa stopu ~@${p.sl} tetiklendi (${pctOf(p.sl, p.entry)})`, { entry: p.entry,
+            tg: `<b>STOP · ${id}</b>${String.fromCharCode(10)}Giriş ${p.entry} → stop ${p.sl} (${pctOf(p.sl, p.entry)}) · borsa tarafında kapandı${String.fromCharCode(10)}Kasa ${st.equity.toFixed(2)} (${dayPct()})` }); continue;
         }
         const px = await getLast(atk, id);
         if (px >= p.target) await closePosition(id, p, "hedef");
@@ -151,7 +164,11 @@ ${journal}`);
         if (minutes >= toMin(CFG.session.start) && minutes < toMin(CFG.session.flat)) await onBarClose();
         else log("info", `${hm}: seans dışı, sadece izleme`);
       }
-      if (minutes % 15 === 0) log("snapshot", `kasa ${st.equity.toFixed(2)} USDT (${((st.equity / st.dayStartEquity - 1) * 100).toFixed(2)}%) | açık ${Object.keys(st.positions).length} | bekleyen ${Object.keys(st.pending).length} | işlem ${st.tradesToday} | MCP çağrı ${atk.calls} hata ${atk.errors} | ${shadowSummary(st.shadow, st.dayStartEquity)}`);
+      if (minutes % 15 === 0) {
+        const shPct = st.dayStartEquity ? (st.shadow.pnlUsdt / st.dayStartEquity) * 100 : 0;
+        log("snapshot", `kasa ${st.equity.toFixed(2)} USDT (${dayPct()}) · ${Object.keys(st.positions).length} açık · ${Object.keys(st.pending).length} bekleyen · ${st.tradesToday} işlem · MCP ${atk.calls} çağrı ${atk.errors} hata · ${shadowSummary(st.shadow, st.dayStartEquity)}`,
+          { tg: `<b>${hm} durum</b>${String.fromCharCode(10)}Kasa ${st.equity.toFixed(2)} USDT (${dayPct()})${String.fromCharCode(10)}${Object.keys(st.positions).length} açık · ${Object.keys(st.pending).length} bekleyen · ${st.tradesToday}/${CFG.risk.maxTradesPerDay} işlem${String.fromCharCode(10)}Kovalayan bot ${shPct >= 0 ? "+" : ""}${shPct.toFixed(2)}% (${st.shadow.trades} işlem) · ben ${dayPct()}` });
+      }
       if (minutes % 15 === 0) { const a = await anchorFlush(); if (a) log("info", `X Layer denetim izi: ${a.n} karar → ${a.root.slice(0, 18)}… ${a.url}`); }
     } catch (e) {
       log("error", `tick: ${(e as Error).message?.slice(0, 200)}`);
@@ -199,31 +216,63 @@ ${journal}`);
     raw.sort((a, b) => b.sweep.depthPct - a.sweep.depthPct);
     last.scan = `${hm}: ${raw.length} aday: ${raw.map((r) => `${r.t.instId} (derinlik ${r.sweep.depthPct.toFixed(2)}%)`).join(", ") || "yok"}`;
     last.gate = `BTC filtresi ${gate.open ? "AÇIK" : "KAPALI"} — BTC 4h ${gate.retPct.toFixed(2)}% (${hm})`;
-    log("scan", `${hm}: BTC 4h ${gate.retPct.toFixed(2)}% → BTC filtresi ${gate.open ? "AÇIK" : "KAPALI"} | ${universe.length} parite tarandı | ${raw.length} dip avı adayı${skipped.length ? " | elenen " + skipped.length : ""}`,
+    log("scan", `${hm} taraması · ${universe.length} parite · BTC 4 saatlik ${gate.retPct >= 0 ? "+" : ""}${gate.retPct.toFixed(2)}% → filtre ${gate.open ? "açık" : "kapalı"} · ${raw.length ? raw.length + " dip avı adayı: " + raw.map((r) => r.t.instId).join(", ") : "aday yok"}${skipped.length ? ` · ${skipped.length} elendi` : ""}`,
       { candidates: raw.map((r) => `${r.t.instId} d${r.sweep.depthPct.toFixed(2)}`), skipped: skipped.slice(0, 12) });
 
-    if (hm.endsWith(":00")) {
+    if (bucket % 4 === 0) {   // saat başı taraması
       const heads = await getImportantNews(atk, 4);
-      if (heads.length) log("info", `${hm} piyasa notu (OKX news, yüksek önem): ${heads.map((h) => "• " + h.slice(0, 90)).join(" ")}`);
+      if (heads.length) log("info", `${hm} piyasa notu (OKX news, yüksek önem): ${heads.map((h) => "• " + h.slice(0, 100)).join(" ")}`, { tg: `<b>${hm} piyasa notu</b> · OKX news${String.fromCharCode(10)}${heads.map((h) => "• " + H(h.slice(0, 120))).join(String.fromCharCode(10))}` });
     }
-    if (!gate.open) { log("gate", `BTC FİLTRESİ KAPALI: BTC 4 saatte ${gate.retPct.toFixed(2)}%. ${raw.length} aday reddedildi, nakitte bekliyorum.`, { reason: "BTC düşerken long-only spotta risk bütçesi sıfır" }); return; }
-    if (!raw.length) return;
-    if (!slots.ok) { log("reject", `${raw.length} aday var ama giriş yok: ${slots.why}`); return; }
+    if (!gate.open) { log("gate", `BTC filtresi kapalı · BTC 4 saatte ${gate.retPct.toFixed(2)}% · ${raw.length} aday reddedildi, nakitte bekliyorum`, { reason: "BTC düşerken long-only spotta risk bütçesi sıfır", tg: `<b>BTC FİLTRESİ KAPALI</b>${String.fromCharCode(10)}BTC 4 saatte ${gate.retPct.toFixed(2)}% · ${raw.length} aday reddedildi · nakitte bekliyorum` }); return; }
+    // haber adayları: son 45 dk, izleme listesinde coin etiketi olan yüksek önemli haber (teknik kurulum şartı yok)
+    st.seenNews ??= {}; st.newsTradesToday ??= 0;
+    const newsCands: { t: Ticker; headline: string; bars: Bar[]; rs: number; range: number }[] = [];
+    if (gate.open && (st.newsTradesToday ?? 0) < 1) {
+      try {
+        const fresh = await getFreshCoinNews(atk, 45);
+        for (const n of fresh) {
+          if (st.seenNews[n.id]) continue;
+          st.seenNews[n.id] = Date.now();
+          for (const coin of n.coins) {
+            const t = universe.find((u) => u.instId === `${coin}-USDT`);
+            if (!t || st.positions[t.instId] || st.pending[t.instId] || raw.some((r) => r.t.instId === t.instId) || newsCands.some((x) => x.t.instId === t.instId)) continue;
+            if ((st.cooldown[t.instId] ?? -999) > bucket - CFG.risk.cooldownBars) continue;
+            const bars = await getCandles(atk, t.instId, 40);
+            const rs = relStrength(bars, btc, CFG.entry.rsBars);
+            if (rs > 3) { log("info", `haber adayı elendi: ${t.instId} fiyat zaten fırlamış (RS ${rs.toFixed(1)}%) · "${n.title.slice(0, 80)}"`); continue; }
+            newsCands.push({ t, headline: n.title, bars, rs, range: dayRangePct(bars, sStart) });
+            log("info", `HABER ADAYI: ${t.instId} · "${n.title.slice(0, 110)}"`, { tg: `<b>Haber adayı · ${t.instId}</b>${String.fromCharCode(10)}${H(n.title.slice(0, 160))}${String.fromCharCode(10)}Karar katmanına gidiyor (günde en fazla 1 haber işlemi)` });
+            if (newsCands.length >= 2) break;
+          }
+          if (newsCands.length >= 2) break;
+        }
+      } catch (e) { log("error", `haber taraması: ${(e as Error).message?.slice(0, 120)}`); }
+    }
+
+    if (!raw.length && !newsCands.length) return;
+    if (!slots.ok) { log("reject", `${raw.length + newsCands.length} aday var ama giriş yok: ${slots.why}`); return; }
     const freeSlots = CFG.risk.maxPositions - Object.keys(st.positions).length - Object.keys(st.pending).length;
 
-    // zenginleştirme (en derin 6)
+    // zenginleştirme (en derin 6 dip avı + haber adayları)
     const top = raw.slice(0, 6);
-    const cands: Candidate[] = await Promise.all(top.map(async (r) => {
+    const newsEnriched: Candidate[] = await Promise.all(newsCands.map(async (r) => {
+      let bookImb = 1;
+      try { const bk = await getBook(atk, r.t.instId, 20); bookImb = bookImbalance(bk.bids, bk.asks, 1.0); } catch { /* */ }
+      const coin = r.t.instId.split("-")[0]!;
+      const close = r.bars[r.bars.length - 1]!.c;
+      return { instId: r.t.instId, close, depthPct: 0, mid: close * 1.015, rs4h: r.rs, dayRangePct: r.range, volUsd: r.t.volUsd, bookImb, smart: smart.get(coin), news: await getNews(atk, coin), sentiment: await getSentiment(atk, coin), ta: technicalContext(r.bars, sStart), source: "haber" as const, headline: r.headline };
+    }));
+    const cands: Candidate[] = (await Promise.all(top.map(async (r): Promise<Candidate> => {
       let bookImb = 1; let news: string[] = [];
       try { const bk = await getBook(atk, r.t.instId, 20); bookImb = bookImbalance(bk.bids, bk.asks, 1.0); } catch { /* */ }
       const coin = r.t.instId.split("-")[0]!;
       news = await getNews(atk, coin);
       const sentiment = await getSentiment(atk, coin);
       const ta = technicalContext(r.bars, sStart);
-      return { instId: r.t.instId, close: r.sweep.close, depthPct: r.sweep.depthPct, mid: r.sweep.mid, rs4h: r.rs, dayRangePct: r.range, volUsd: r.t.volUsd, bookImb, smart: smart.get(coin), news, sentiment, ta };
-    }));
+      return { instId: r.t.instId, close: r.sweep.close, depthPct: r.sweep.depthPct, mid: r.sweep.mid, rs4h: r.rs, dayRangePct: r.range, volUsd: r.t.volUsd, bookImb, smart: smart.get(coin), news, sentiment, ta, source: "dip avı" as const };
+    }))).concat(newsEnriched);
 
-    last.cands = cands.map((c) => ({ instId: c.instId, close: c.close, depth: +c.depthPct.toFixed(2), mid: c.mid, rs4h: +c.rs4h.toFixed(2), range: +c.dayRangePct.toFixed(2), book: +c.bookImb.toFixed(2), smart: c.smart ? +c.smart.longRatio.toFixed(2) : null, sentiment: c.sentiment?.label ?? null, news: c.news.length, hm, rsi: c.ta?.rsi ?? null, trend: c.ta?.trend ?? null, atr: c.ta?.atrPct ?? null, vwap: c.ta?.vwapDist ?? null, volr: c.ta?.volRatio ?? null }));
+    last.cands = cands.map((c) => ({ instId: c.instId, source: c.source ?? "dip avı", close: c.close, depth: +c.depthPct.toFixed(2), mid: c.mid, rs4h: +c.rs4h.toFixed(2), range: +c.dayRangePct.toFixed(2), book: +c.bookImb.toFixed(2), smart: c.smart ? +c.smart.longRatio.toFixed(2) : null, sentiment: c.sentiment?.label ?? null, news: c.news.length, hm, rsi: c.ta?.rsi ?? null, trend: c.ta?.trend ?? null, atr: c.ta?.atrPct ?? null, vwap: c.ta?.vwapDist ?? null, volr: c.ta?.volRatio ?? null }));
     const d = await decide(cands, freeSlots, { btcRetPct: gate.retPct, equity: st.equity, tr: hm });
     last.llm = [`Karar (${d.provider}): ${d.note}`, ...d.picks.map((p) => `✅ ${p.instId}: ${p.reason}`), ...d.rejects.map((p) => `⛔ ${p.instId}: ${p.reason}`)].join(String.fromCharCode(10));
     log("llm", `${d.provider}: ${d.picks.length} seçim, ${d.rejects.length} ret. ${d.note}`, {
@@ -234,6 +283,7 @@ ${journal}`);
     for (const pick of d.picks) {
       const c = cands.find((x) => x.instId === pick.instId)!; const i = inst.get(c.instId);
       if (!i) { log("reject", `${c.instId}: enstrüman bilgisi yok`); continue; }
+      if (c.source === "haber" && (st.newsTradesToday ?? 0) >= 1) { log("reject", `${c.instId}: günlük haber işlemi hakkı dolu`); continue; }
       const notional = positionNotional(st.equity, CFG.risk);
       const px = roundPrice(c.close, i.tickSz);
       const sz = roundSize(notional / px, i.lotSz, i.minSz);
@@ -246,9 +296,11 @@ ${journal}`);
       }
       try {
         const ordId = await placeLimitBuy(atk, { instId: c.instId, px: String(px), sz: String(sz), slPx: String(sl), clOrdId: `ag${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`.slice(0, 32) });
-        st.pending[c.instId] = { instId: c.instId, ordId, px, sz, target: c.mid, sl, ts: Date.now(), reason: pick.reason };
-        st.tradesToday++;
-        log("entry", `${c.instId}: limit alış ${sz} @${px} (${(sz * px).toFixed(2)} USDT) | SL ${sl} borsada | hedef ${targetPrice(px, c.mid, CFG.exit.targetMinPct).toFixed(6)}`, { reason: pick.reason, depth: c.depthPct, book: c.bookImb });
+        st.pending[c.instId] = { instId: c.instId, ordId, px, sz, target: c.mid, sl, ts: Date.now(), reason: (c.source === "haber" ? `[haber: ${c.headline?.slice(0, 80)}] ` : "") + pick.reason };
+        st.tradesToday++; if (c.source === "haber") st.newsTradesToday = (st.newsTradesToday ?? 0) + 1;
+        const tgt = targetPrice(px, c.mid, CFG.exit.targetMinPct);
+        log("entry", `${c.instId} alış emri · ${sz} adet @${px} (${(sz * px).toFixed(2)} USDT, kasanın %${((sz * px) / st.equity * 100).toFixed(1)}'i) · hedef ${tgt.toFixed(4)} (${pctOf(tgt, px)}) · stop ${sl} borsada`, { reason: pick.reason, depth: c.depthPct, book: c.bookImb, source: c.source ?? "dip avı",
+          tg: `<b>ALIŞ EMRİ · ${c.instId}</b>${c.source === "haber" ? " · haber adayı" : ""}${String.fromCharCode(10)}${sz} adet @ ${px} (${(sz * px).toFixed(2)} USDT, kasanın %${((sz * px) / st.equity * 100).toFixed(1)}'i)${String.fromCharCode(10)}Hedef ${tgt.toFixed(4)} (${pctOf(tgt, px)}) · stop ${sl} (${pctOf(sl, px)}, borsada)${String.fromCharCode(10)}<i>${H(pick.reason)}</i>` });
       } catch (e) { log("error", `${c.instId} emir: ${(e as Error).message?.slice(0, 200)}`); }
     }
     saveState(st);

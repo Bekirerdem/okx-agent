@@ -8,12 +8,14 @@ export type Candidate = {
   instId: string; close: number; depthPct: number; mid: number; rs4h: number; dayRangePct: number; volUsd: number;
   bookImb: number; smart?: { longRatio: number; traders: number; vs24h: number }; news: string[]; sentiment?: { score: number; label: string } | null;
   ta?: { rsi: number; trend: string; atrPct: number; vwapDist: number; volRatio: number };
+  source?: "dip avı" | "haber";
+  headline?: string;
 };
 export type Decision = { picks: { instId: string; reason: string }[]; rejects: { instId: string; reason: string }[]; note: string; provider: string };
 
 function prompt(cands: Candidate[], freeSlots: number, ctx: { btcRetPct: number; equity: number; tr: string }): string {
   const rows = cands.map((c) => ({
-    instId: c.instId, close: c.close, sweep_depth_pct: +c.depthPct.toFixed(2), target_mid: c.mid, rs_vs_btc_4h_pct: +c.rs4h.toFixed(2),
+    instId: c.instId, source: c.source ?? "dip avı", headline: c.headline ?? null, close: c.close, sweep_depth_pct: +c.depthPct.toFixed(2), target_mid: c.mid, rs_vs_btc_4h_pct: +c.rs4h.toFixed(2),
     day_range_pct: +c.dayRangePct.toFixed(2), vol24h_usd_m: +(c.volUsd / 1e6).toFixed(1), book_bid_ask_ratio_1pct: +c.bookImb.toFixed(2),
     smart_money: c.smart ? { long_ratio: +c.smart.longRatio.toFixed(2), traders: c.smart.traders, vs24h: +c.smart.vs24h.toFixed(2) } : null,
     news_6h_high: c.news.slice(0, 3),
@@ -25,6 +27,7 @@ Tez: Cumartesi geri dönüş piyasası; stopları avlanmış (dip avı + içeri 
 BTC 4 saatlik getiri: ${ctx.btcRetPct.toFixed(2)}%. Kasa: ${ctx.equity.toFixed(2)} USDT. Boş slot: ${freeSlots}.
 Yetkin: adaylar arasından en fazla ${freeSlots} tanesini SEÇMEK ya da hepsini reddetmek. Boyut, stop, BTC filtresi ve fren kod tarafındadır, onları tartışma.
 Seçim ölçütleri: (1) haberde delist/hack/exploit/soruşturma varsa KESİN RED; (2) emir defteri alıcı ağır (>1) ise artı; (3) smart money long oranı çok yüksek (>0.9) ve 24h'de artmışsa kalabalık uyarısı, çok düşükse (<0.4) squeeze potansiyeli; (4) göreli güç +2'ye yakınsa kovalama riski; (5) dip avı derinliği ve gün aralığı yüksekse gerçek stop avı olasılığı yüksek; (6) teknik bağlam: RSI çok düşükse (<35) geri dönüş potansiyeli artı, EMA20<EMA50 (aşağı trend) ve VWAP'ın çok altındaysa "düşen bıçak" riski, hacim oranı >1.5 stop avının gerçek olduğunu destekler, ATR yüksekse hedefe ulaşma olasılığı artar ama stop riski de.
+Aday türleri: "dip avı" (fiyat 3 saatlik dibi delip geri döndü) ve "haber" (son 45 dakikada bu coin hakkında yüksek önemli haber çıktı, teknik kurulum yok). HABER adayını yalnızca haber somut ve olumluysa seç: listeleme, ortaklık, mainnet/upgrade, geri alım, ETF/onay, büyük entegrasyon. Genel piyasa yorumu, fiyat analizi, "yükseldi/düştü" haberleri, soruşturma/hack/delist için KESİN RED. Haber adayında fiyat zaten fırlamışsa (RS4h > +3) kovalama sayılır, red.
 Kısa, Türkçe, somut gerekçe yaz. SADECE şu JSON'u döndür, başka metin yok:
 {"picks":[{"instId":"...","reason":"..."}],"rejects":[{"instId":"...","reason":"..."}],"note":"tek cümle rejim yorumu"}
 ADAYLAR:

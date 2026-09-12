@@ -37,7 +37,8 @@ export class Atk {
         let obj: any;
         try { obj = JSON.parse(text); } catch { throw new Error(`ATK yanıtı JSON değil (${name}): ${text.slice(0, 200)}`); }
         if (obj.ok === false || res.isError) {
-          const msg = obj.error?.message ?? obj.error ?? obj.message ?? text.slice(0, 200);
+          const raw = obj.error?.message ?? (typeof obj.error === "string" ? obj.error : null) ?? obj.message;
+          const msg = raw && raw !== true ? raw : "borsa yanıt vermedi (ağ ya da API kesintisi)";
           const code = obj.error?.code ?? obj.code ?? "";
           const e = new Error(`${name}: ${msg} ${code ? "(" + code + ")" : ""}`);
           (e as any).code = code;

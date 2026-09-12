@@ -26,15 +26,28 @@ export function trTime(d = new Date()): string {
   return d.toLocaleTimeString("tr-TR", { timeZone: CFG.tz, hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
+let lastErr = { text: "", n: 0 };
+const H = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/** data.tg varsa Telegram'a o HTML metin gider (günlüğe yazılmaz); yoksa sade satır. Aynı hata art arda gelirse Telegram'a seyrek düşer. */
 export function log(kind: Kind, msg: string, data?: Record<string, unknown>): void {
-  const e: Entry = { ts: new Date().toISOString(), kind, role: ROLE[kind], msg, ...(data ? { data } : {}) };
+  const { tg, ...rest } = (data ?? {}) as Record<string, unknown> & { tg?: string };
+  const clean = Object.keys(rest).length ? rest : undefined;
+  const e: Entry = { ts: new Date().toISOString(), kind, role: ROLE[kind], msg, ...(clean ? { data: clean } : {}) };
   const line = `${ICON[kind]} ${trTime()} ${ROLE[kind]}·${kind} │ ${msg}`;
   console.log(line);
   try {
     appendFileSync(CFG.paths.journal, JSON.stringify(e) + "\n");
-    appendFileSync(CFG.paths.md, `- ${line}${data ? "  \n  `" + JSON.stringify(data).slice(0, 400) + "`" : ""}\n`);
+    appendFileSync(CFG.paths.md, `- ${line}${clean ? "  \n  `" + JSON.stringify(clean).slice(0, 400) + "`" : ""}\n`);
   } catch (err) { console.error("günlük yazılamadı", err); }
-  if (TG_KINDS.has(kind)) void telegram(line + (data?.reason ? `\n${data.reason}` : ""));
+  if (!TG_KINDS.has(kind)) return;
+  if (kind === "error") {
+    if (msg === lastErr.text) { lastErr.n++; if (lastErr.n % 5 !== 0) return; } else lastErr = { text: msg, n: 1 };
+    void telegram(`⚠️ <b>Hata</b> · ${trTime().slice(0, 5)}${lastErr.n > 1 ? ` (${lastErr.n}. kez)` : ""}${String.fromCharCode(10)}${H(msg)}`, true);
+    return;
+  }
+  if (tg) void telegram(`${ICON[kind]} ${tg}`, true);
+  else void telegram(line + (clean?.reason ? `${String.fromCharCode(10)}${clean.reason}` : ""));
 }
 
 let tgChain: Promise<void> = Promise.resolve();
