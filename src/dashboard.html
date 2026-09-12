@@ -7,13 +7,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
-  /* DESIGN DNA — üç sütun, üç soru. Projektörde 5 metreden okunur.
+  /* DESIGN DNA — üç sütun, üç soru. Projektörde 5 metreden okunur; her bölüm tek bakışta biter.
      SORULAR  "Param ne durumda" · "Ajan şu an ne yapıyor" · "Neden güvende" — her sütun tek soruya cevap verir, başka bölüm yok
      PALETTE  kağıt #f5f2ea 86% · mürekkep #14171c 10% · gri #5b6270 · tek vurgu amber #c2410c ≤ 3% · artı #15803d · eksi #b91c1c · çizgi #d9d3c4
      TYPE     sayılar JetBrains Mono 800 · gövde Instrument Sans 17px · durum cümlesi 26px · en küçük metin 13px
-     LAYOUT   400 | AKIŞ | 380 · başlık 68px · soru başlığı 2px mürekkep çizgi · bölüm ritmi 28px
-     THE MOVE kasa 84px · durum cümlesi düz Türkçe, tablo yok
-     REFUSALS gradient yok · gölge yok · kart yok · ikon yok · rol adı başlıkta yok · kısaltma yok (RS/ATR/VWAP tabloya değil ayrıntı satırına) */
+     LAYOUT   400 | AKIŞ | 380 · başlık 68px · soru başlığı 2px mürekkep çizgi · bölüm ritmi 26px
+     THE MOVE kasa 84px · durum cümlesi düz Türkçe, en çok iki cümle
+     REFUSALS gradient yok · gölge yok · kart yok · ikon yok · rol adı başlıkta yok · uzun gerekçe açıkta yok (tıkla aç) · adet ve uzun ondalık yok · akışta tarama gürültüsü yok (tümü seçilmedikçe) */
   :root { --bg:#f5f2ea; --ink:#14171c; --muted:#5b6270; --acc:#c2410c; --up:#15803d; --dn:#b91c1c; --line:#d9d3c4; --soft:#ece8dd; }
   * { box-sizing:border-box; margin:0; padding:0; }
   html,body { height:100%; background:var(--bg); color:var(--ink); font-family:"Instrument Sans",system-ui,sans-serif; font-size:17px; line-height:1.45; }
@@ -30,7 +30,7 @@
   .col { overflow:auto; padding:24px 28px 48px; }
   .col.l { border-right:1px solid var(--line); } .col.r { border-left:1px solid var(--line); }
   .q { font-family:"JetBrains Mono"; font-size:14px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; padding-bottom:12px; border-bottom:2px solid var(--ink); margin-bottom:22px; }
-  .label { font-family:"JetBrains Mono"; font-size:12px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin:28px 0 8px; display:flex; justify-content:space-between; gap:12px; }
+  .label { font-family:"JetBrains Mono"; font-size:12px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin:26px 0 8px; display:flex; justify-content:space-between; gap:12px; }
   .label .t { font-weight:400; letter-spacing:0; text-transform:none; white-space:nowrap; }
   .q + .label, .label.first { margin-top:0; }
   .up { color:var(--up); } .dn { color:var(--dn); } .acc { color:var(--acc); } .g { color:var(--muted); }
@@ -40,8 +40,7 @@
   .equity small { font-size:22px; font-weight:500; color:var(--muted); margin-left:8px; letter-spacing:0; }
   .delta { font-family:"JetBrains Mono"; font-size:22px; font-weight:700; margin-top:10px; }
   .delta .gs { color:var(--muted); font-weight:400; font-size:15px; margin-left:8px; }
-  .fine { font-family:"JetBrains Mono"; font-size:14px; color:var(--muted); margin-top:6px; }
-  svg { width:100%; height:64px; display:block; margin-top:12px; }
+  svg { width:100%; height:64px; display:block; margin-top:14px; }
 
   .pos { padding:14px 0; border-bottom:1px solid var(--line); font-size:15px; }
   .pos:last-child { border-bottom:0; }
@@ -58,10 +57,12 @@
   .status { font-size:26px; font-weight:600; line-height:1.3; letter-spacing:-.01em; }
   .status .sub { display:block; font-family:"JetBrains Mono"; font-size:14px; font-weight:400; color:var(--muted); margin-top:12px; letter-spacing:0; }
   .note { font-size:17px; line-height:1.5; }
-  .dec { padding:12px 0; border-top:1px solid var(--line); margin-top:12px; }
+  .dec { padding:12px 0; border-top:1px solid var(--line); margin-top:12px; cursor:pointer; }
   .dec b { font-family:"JetBrains Mono"; font-size:17px; font-weight:800; }
   .dec .v { font-family:"JetBrains Mono"; font-size:12px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin-left:10px; }
-  .dec .why { margin-top:4px; }
+  .dec .why { margin-top:4px; color:var(--muted); }
+  .dec .why.clip { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .dec .more { font-family:"JetBrains Mono"; font-size:12px; color:var(--acc); margin-top:4px; }
   .dec .detail { font-family:"JetBrains Mono"; font-size:13px; color:var(--muted); margin-top:8px; line-height:1.7; }
 
   .chips { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:4px; }
@@ -73,8 +74,8 @@
   .row .t .n { display:block; font-size:12px; margin-top:2px; }
   .row .k { font-family:"JetBrains Mono"; font-size:12px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; padding-top:4px; color:var(--muted); }
   .row .m { font-size:17px; word-break:break-word; }
-  .row .m .d { display:block; color:var(--muted); font-size:15px; margin-top:6px; white-space:pre-wrap; }
   .row .m .x { font-family:"JetBrains Mono"; font-size:13px; font-weight:700; color:var(--muted); margin-left:8px; white-space:nowrap; }
+  .row .m .more { font-family:"JetBrains Mono"; font-size:13px; color:var(--acc); cursor:pointer; margin-left:6px; white-space:nowrap; }
   .row.kind-llm .k { color:var(--acc); } .row.kind-llm .m { font-weight:600; }
   .row.kind-entry .k, .row.kind-fill .k, .row.kind-exit .k { color:var(--up); } .row.kind-entry .m, .row.kind-fill .m, .row.kind-exit .m { font-weight:600; }
   .row.kind-stop .k, .row.kind-halt .k, .row.kind-reject .k, .row.kind-error .k { color:var(--dn); } .row.kind-stop .m, .row.kind-halt .m { font-weight:600; }
@@ -82,18 +83,17 @@
 
   .gate { font-family:"JetBrains Mono"; font-size:24px; font-weight:800; line-height:1.2; }
   .gate .sub { display:block; font-size:14px; font-weight:400; color:var(--muted); margin-top:4px; }
-  .cage { font-size:15px; color:var(--muted); line-height:1.8; }
-  .cage b { color:var(--ink); font-weight:600; font-family:"JetBrains Mono"; }
   .duel { display:grid; grid-template-columns:1fr 1fr; gap:0 20px; }
   .duel .n { font-family:"JetBrains Mono"; font-size:34px; font-weight:800; letter-spacing:-.03em; line-height:1; }
   .duel .k { font-size:14px; color:var(--muted); margin-top:6px; }
   .duel .k b { color:var(--ink); font-weight:600; }
+  .line { font-size:14px; color:var(--muted); margin-top:10px; line-height:1.5; }
   .kv { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:6px 16px; font-size:14px; }
   .kv div:nth-child(odd) { font-family:"JetBrains Mono"; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .kv div:nth-child(even) { font-family:"JetBrains Mono"; font-weight:700; text-align:right; }
+  .col.r .label { margin-top:22px; }
   .kv.rules { font-size:15px; gap:8px 16px; grid-template-columns:auto 1fr; } .kv.rules div:nth-child(odd) { font-family:"Instrument Sans"; font-size:15px; color:var(--muted); overflow:visible; }
-  .row .m .more { font-family:"JetBrains Mono"; font-size:13px; color:var(--acc); cursor:pointer; margin-left:6px; white-space:nowrap; }
-  .anchor { font-size:14px; }
+  .anchor { font-size:14px; line-height:1.6; }
   .anchor a { font-family:"JetBrains Mono"; color:var(--ink); text-decoration:underline; text-underline-offset:3px; }
   .askf { display:grid; grid-template-columns:1fr auto; border:2px solid var(--ink); }
   .askf input { background:transparent; border:0; color:var(--ink); font:inherit; font-size:16px; padding:12px 14px; outline:none; min-width:0; }
@@ -120,7 +120,6 @@
     <div class="label first">Kasa</div>
     <div class="equity" id="eq">—<small>USDT</small></div>
     <div class="delta" id="delta"></div>
-    <div class="fine" id="fine"></div>
     <svg id="spark" viewBox="0 0 300 64" preserveAspectRatio="none"></svg>
 
     <div class="label"><span>Açık pozisyon</span><span class="t">canlı fiyat</span></div>
@@ -136,7 +135,7 @@
 
     <div class="label">Ajana sor · günlüğüne bakıp cevaplar</div>
     <form id="askf" class="askf" autocomplete="off">
-      <input id="askq" type="text" placeholder="neden işlem açmadın? şu an en riskli ne? RAY'i neden aldın?" maxlength="300">
+      <input id="askq" type="text" placeholder="neden işlem açmadın? şu an en riskli ne?" maxlength="300">
       <button type="submit" id="askb">sor</button>
     </form>
     <div class="answer" id="answer" hidden></div>
@@ -146,7 +145,7 @@
 
     <div class="label"><span>Olan biten</span><span class="t" id="streamn"></span></div>
     <div class="chips" id="chips">
-      <button data-f="" class="on">tümü</button><button data-f="karar">kararlar</button><button data-f="islem">işlemler</button><button data-f="hata">hatalar</button>
+      <button data-f="onemli" class="on">kararlar ve işlemler</button><button data-f="">tümü</button><button data-f="hata">hatalar</button>
     </div>
     <div id="stream"></div>
   </main>
@@ -157,18 +156,24 @@
     <div class="gate" id="gate">henüz tarama yok</div>
 
     <div class="label">Risk kuralları · kodda, LLM değiştiremez</div>
-    <div class="kv rules"><div>pozisyon büyüklüğü</div><div>kasanın %12,5'i</div><div>stop</div><div>−%4 · borsada</div><div>hedef</div><div>+%0,3 … +%0,5 · borsada</div><div>kâr kilidi</div><div>+%0,35'te stop girişe</div><div>aynı anda</div><div>≤3 pozisyon</div><div>günde</div><div>≤10 işlem</div><div>gün freni</div><div>−%2</div><div>son giriş · nakit</div><div>18:50 · 19:15</div></div>
+    <div class="kv rules">
+      <div>işlem başına risk</div><div>kasanın %0,5'i</div>
+      <div>stop ve hedef</div><div>borsada (OCO)</div>
+      <div>aynı anda</div><div>≤3 pozisyon</div>
+      <div>günde</div><div>≤10 işlem</div>
+      <div>gün freni</div><div>−%2 → nakit</div>
+      <div>son giriş · nakit</div><div>18:50 · 19:15</div>
+    </div>
 
     <div class="label">Kovalayan bot ile kıyas</div>
     <div class="duel" id="shadow"><div><div class="n">—</div><div class="k">kovalayan bot</div></div><div><div class="n">—</div><div class="k">ben</div></div></div>
-    <div class="cage" id="shadowsub" style="margin-top:8px;font-size:14px;line-height:1.6"></div>
+    <div class="line" id="shadowsub"></div>
 
     <div class="label"><span>X Layer denetim izi</span><span class="t" id="anchn"></span></div>
     <div class="anchor" id="anchors"></div>
 
     <div class="label"><span>ATK MCP araçları</span><span class="t" id="mcpn"></span></div>
     <div class="kv" id="tools"></div>
-
   </section>
 </div>
 <script>
@@ -180,8 +185,8 @@ const sign = (p) => `${p > 0 ? "+" : ""}${fmt(Math.abs(p) < 0.005 ? 0 : p)}%`;
 const cls = (p) => Math.abs(p) < 0.005 ? "" : p > 0 ? "up" : "dn";
 const age = (ms) => { const m = Math.max(0, Math.round(ms / 60000)); return m < 60 ? `${m} dk` : `${Math.floor(m / 60)} sa ${m % 60} dk`; };
 const KIND = { boot: "başladı", scan: "tarama", gate: "BTC filtresi", llm: "karar", reject: "ret", entry: "alış emri", fill: "alındı", cancel: "iptal", exit: "hedef", stop: "stop", halt: "fren", flat: "gün sonu", info: "not", error: "hata", snapshot: "durum" };
-const FILTER = { karar: ["llm", "reject"], islem: ["entry", "fill", "cancel", "exit", "stop", "halt", "flat"], hata: ["error"] };
-let flt = "", lastD = null;
+const FILTER = { onemli: ["llm", "reject", "entry", "fill", "cancel", "exit", "stop", "halt", "flat", "boot"], hata: ["error"] };
+let flt = "onemli", lastD = null;
 
 function spark(snaps) {
   const svg = $("spark"); if (snaps.length < 2) { svg.innerHTML = ""; return; }
@@ -195,13 +200,11 @@ function spark(snaps) {
 function position(p, px) {
   const pl = px ? (px / p.entry - 1) * 100 : null;
   const span = p.target - p.sl; const at = px && span > 0 ? Math.min(1, Math.max(0, (px - p.sl) / span)) : null; const ent = span > 0 ? (p.entry - p.sl) / span : 0.5;
-  const toT = px ? (p.target / px - 1) * 100 : null, toS = px ? (1 - p.sl / px) * 100 : null;
   return `<div class="pos"><div class="top"><b>${p.instId}</b><span class="pl ${pl === null ? "" : cls(pl)}">${pl === null ? "—" : sign(pl)}</span></div>
-    <div class="n">${p.qty} adet <span class="g">·</span> giriş ${p.entry} <span class="g">·</span> şimdi ${px ? px : "—"}</div>
+    <div class="n">giriş ${p.entry} <span class="g">→</span> şimdi ${px ? px : "—"}</div>
     <div class="track"><span class="e" style="left:${(ent * 100).toFixed(1)}%"></span>${at === null ? "" : `<span class="p" style="left:${(at * 100).toFixed(1)}%"></span>`}</div>
-    <div class="ends"><span>stop ${p.sl}${toS === null ? "" : ` · ${fmt(toS, 1)}% uzakta`}</span><span>hedef ${p.target}${toT === null ? "" : ` · ${fmt(toT, 1)}% uzakta`}</span></div>
-    <div class="sub">${p.oco ? "stop ve hedef borsada (OCO)" : "stop borsada"}${p.locked ? ' · <span class="up">kâr kilidi aktif</span>' : ""}${p.openedTs ? ` · ${age(Date.now() - p.openedTs)} önce alındı` : ""}</div>
-    <div class="sub">${esc(p.reason)}</div></div>`;
+    <div class="ends"><span>stop ${p.sl}</span><span>hedef ${p.target}</span></div>
+    <div class="sub">${p.oco ? "stop ve hedef borsada" : "stop borsada"}${p.locked ? ' · <span class="up">kâr kilidi</span>' : ""}${p.openedTs ? ` · ${age(Date.now() - p.openedTs)} önce alındı` : ""}</div></div>`;
 }
 
 function statusText(st, m, d, px) {
@@ -210,16 +213,15 @@ function statusText(st, m, d, px) {
   const gateOpen = /AÇIK/.test(m.lastGate || ""), btc = Number((m.lastGate || "").match(/BTC 4h ([-\d.]+)%/)?.[1] ?? NaN);
   const scans = d.journal.filter((e) => e.kind === "scan"); let dry = 0; for (const e of scans) { if (/aday yok/.test(e.msg)) dry++; else break; }
   const off = d.journal.find((e) => e.kind === "info" && /seans dışı|son giriş saati/.test(e.msg));
-  const s = [];
-  if (off && (!scans[0] || off.ts > scans[0].ts)) s.push(/son giriş/.test(off.msg) ? "Son giriş saati geçti, yeni işlem açmıyorum." : "Seans dışı, sadece izliyorum.");
-  else if (st.halted) s.push("Gün freni devrede: bugün yeni işlem yok.");
-  else if (m.lastGate && !gateOpen) s.push(`BTC 4 saatte ${fmt(btc)}% düştü, filtre kapalı: yeni giriş yok.`);
-  else if (pen.length) s.push(`${pen.map((p) => p.instId).join(", ")} için alış emri bekliyor.`);
-  else s.push(pos.length ? "Yeni aday arıyorum." : "Nakitte bekliyorum, aday arıyorum.");
-  if (pos.length) s.push(`${pos.map((p) => `${p.instId} açık${px[p.instId] ? ` (${sign((px[p.instId] / p.entry - 1) * 100)})` : ""}`).join(", ")}; stop ve hedef borsada.`);
-  if (m.lastGate && gateOpen && !isNaN(btc)) s.push(`${Math.abs(btc) < 0.5 ? "BTC yatay" : btc > 0 ? "BTC yükselişte" : "BTC düşüşte"} (${sign(btc)})${dry > 1 ? `, son ${dry} taramada aday çıkmadı` : ""}.`);
-  const sub = [scans[0] ? `son tarama ${tr(scans[0].ts)}` : null, `5 dakikada bir ${m.universe} parite`, `bugün ${d.counts.scan} tarama · ${d.counts.llm} karar turu · ${st.tradesToday}/10 işlem`].filter(Boolean).join(" · ");
-  return `${s.join(" ")}<span class="sub">${sub}</span>`;
+  let s;
+  if (off && (!scans[0] || off.ts > scans[0].ts)) s = /son giriş/.test(off.msg) ? "Son giriş saati geçti, yeni işlem açmıyorum." : "Seans dışı, sadece izliyorum.";
+  else if (st.halted) s = "Gün freni devrede: bugün yeni işlem yok.";
+  else if (m.lastGate && !gateOpen) s = `BTC 4 saatte ${fmt(btc)}% düştü, filtre kapalı: yeni giriş yok.`;
+  else if (pen.length) s = `${pen.map((p) => p.instId).join(", ")} için alış emri bekliyor.`;
+  else s = pos.length ? "Pozisyon açık, yeni aday arıyorum." : "Nakitte bekliyorum, aday arıyorum.";
+  const b = m.lastGate && gateOpen && !isNaN(btc) ? ` ${Math.abs(btc) < 0.5 ? "BTC yatay" : btc > 0 ? "BTC yükselişte" : "BTC düşüşte"} (${sign(btc)})${dry > 1 ? `, son ${dry} taramada aday yok` : ""}.` : "";
+  const sub = [scans[0] ? `son tarama ${tr(scans[0].ts)}` : null, `${m.universe} parite · 5 dakikada bir`, `bugün ${d.counts.scan} tarama · ${d.counts.llm} karar · ${st.tradesToday}/10 işlem`].filter(Boolean).join(" · ");
+  return `${s}${b}<span class="sub">${sub}</span>`;
 }
 
 function decision(m, d) {
@@ -231,7 +233,7 @@ function decision(m, d) {
   const llmE = d.journal.find((e) => e.kind === "llm");
   $("llmts").textContent = `${llmE ? tr(llmE.ts) : ""}${provider ? ` · ${provider}` : ""}`;
   const detail = (c) => c ? [c.source === "haber" ? "haber adayı" : `dip avı ${fmt(c.depth)}%`, `gün aralığı ${fmt(c.range)}%`, `BTC'ye göre ${sign(c.rs4h)}`, c.rsi !== null ? `RSI ${c.rsi}` : null, c.trend ? `trend ${c.trend}` : null, c.volr !== null ? `hacim ×${fmt(c.volr, 1)}` : null, `defter ${fmt(c.book)}`, c.smart !== null ? `smart money ${fmt(c.smart)}` : null, c.sentiment ? `duygu ${esc(String(c.sentiment).split(" (")[0])}` : null, `haber ${c.news}`].filter(Boolean).join(" · ") : "";
-  $("decision").innerHTML = `<div class="note">${esc(note)}</div>${rows.map((r) => `<div class="dec"><b>${esc(r.id)}</b><span class="v ${r.ok ? "up" : "dn"}">${r.ok ? "seçildi" : "reddedildi"}</span><div class="why">${esc(r.why)}</div>${cands[r.id] ? `<div class="detail">${detail(cands[r.id])}</div>` : ""}</div>`).join("")}`;
+  $("decision").innerHTML = `<div class="note">${esc(note)}</div>${rows.map((r) => `<div class="dec"><b>${esc(r.id)}</b><span class="v ${r.ok ? "up" : "dn"}">${r.ok ? "seçildi" : "reddedildi"}</span><div class="why clip">${esc(r.why)}</div><div class="more">tam gerekçe ve teknik bağlam</div>${cands[r.id] ? `<div class="detail" hidden>${detail(cands[r.id])}</div>` : ""}</div>`).join("")}`;
 }
 
 function stream(d) {
@@ -240,8 +242,8 @@ function stream(d) {
   for (const e of rows) { const g = groups[groups.length - 1]; if (g && g.e.kind === e.kind && g.e.msg === e.msg) { g.n++; g.first = e.ts; } else groups.push({ e, n: 1, first: e.ts }); }
   const vis = groups.filter((g) => !flt || FILTER[flt].includes(g.e.kind));
   $("streamn").textContent = `${vis.length} satır`;
-  const msg = (s) => { const full = esc(s).replace(/https?:\/\/\S+/g, (u) => `<a href="${u}" target="_blank" style="color:inherit">zincirde gör</a>`); if (s.length <= 200) return full; const i = full.indexOf(" ", 180); return `<span class="short">${full.slice(0, i > 0 ? i : 180)}… <span class="more">devamı</span></span><span class="full" hidden>${full}</span>`; };   // uzun notlar (haber özeti) tek satır, tıkla aç
-  $("stream").innerHTML = vis.map(({ e, n, first }) => `<div class="row kind-${e.kind}"><div class="t">${tr(e.ts)}${n > 1 ? `<span class="n">${tr(first)}'den beri</span>` : ""}</div><div class="k">${KIND[e.kind] || e.kind}</div><div class="m">${msg(e.msg)}${n > 1 ? `<span class="x">×${n}</span>` : ""}${e.data?.reason ? `<span class="d">${esc(e.data.reason)}</span>` : ""}${e.data?.picks?.length ? `<span class="d">${esc(e.data.picks.join("\n"))}</span>` : ""}${e.data?.rejects?.length ? `<span class="d">${esc(e.data.rejects.join("\n"))}</span>` : ""}</div></div>`).join("") || '<span class="empty">bu filtrede kayıt yok</span>';
+  const msg = (s) => { const full = esc(s).replace(/https?:\/\/\S+/g, (u) => `<a href="${u}" target="_blank" style="color:inherit">zincirde gör</a>`); if (s.length <= 140) return full; const i = full.indexOf(" ", 120); return `<span class="short">${full.slice(0, i > 0 ? i : 120)}… <span class="more">devamı</span></span><span class="full" hidden>${full}</span>`; };   // uzun gerekçe ve haber notu tek satır, tıkla aç
+  $("stream").innerHTML = vis.map(({ e, n, first }) => `<div class="row kind-${e.kind}"><div class="t">${tr(e.ts)}${n > 1 ? `<span class="n">${tr(first)}'den beri</span>` : ""}</div><div class="k">${KIND[e.kind] || e.kind}</div><div class="m">${msg(e.msg)}${n > 1 ? `<span class="x">×${n}</span>` : ""}</div></div>`).join("") || '<span class="empty">bu filtrede kayıt yok</span>';
 }
 
 const STATIC = !!window.__STATIC__;   // dist/index.html: veri gömülü, sunucu yok (yayinla.bat ile 5 dakikada bir yenilenir)
@@ -259,14 +261,13 @@ async function refresh() {
     const diff = st.equity - (st.dayStartEquity || st.equity);
     $("eq").innerHTML = `${fmt(st.equity)}<small>USDT</small>`;
     $("delta").innerHTML = `<span class="${cls(me)}">${sign(me)}</span><span class="gs">${diff >= 0 ? "+" : "−"}${fmt(Math.abs(diff))} USDT bugün</span>${st.halted ? ' <span class="dn">· FREN</span>' : ""}`;
-    $("fine").textContent = `gün başı ${fmt(st.dayStartEquity)} USDT · ${st.tradesToday} / 10 işlem`;
     const pos = Object.values(st.positions);
     $("positions").innerHTML = pos.length ? pos.map((p) => position(p, px[p.instId])).join("") : '<span class="empty">yok, nakitteyim</span>';
     const pen = Object.values(st.pending);
     $("pendwrap").hidden = !pen.length;
-    $("pending").innerHTML = pen.map((p) => `<div class="pos"><div class="top"><b>${p.instId}</b><span class="n">${p.ts ? age(Date.now() - p.ts) + " bekliyor" : ""}</span></div><div class="n">limit ${p.sz} @ ${p.px}${px[p.instId] ? ` <span class="g">· şimdi ${px[p.instId]}</span>` : ""}</div><div class="sub">${esc(p.reason)}</div></div>`).join("");
+    $("pending").innerHTML = pen.map((p) => `<div class="pos"><div class="top"><b>${p.instId}</b><span class="n">${p.ts ? age(Date.now() - p.ts) + " bekliyor" : ""}</span></div><div class="n">limit ${p.px}${px[p.instId] ? ` <span class="g">· şimdi ${px[p.instId]}</span>` : ""}</div></div>`).join("");
     const cl = [...st.closed].reverse();
-    $("closed").innerHTML = cl.length ? cl.map((c) => `<div class="pos"><div class="top"><b>${c.instId}</b><span class="pl ${c.pnl >= 0 ? "up" : "dn"}">${c.pnl >= 0 ? "+" : ""}${fmt(c.pnl, 3)} USDT</span></div><div class="n">${c.entry} → ${c.exit} <span class="g">(${sign((c.exit / c.entry - 1) * 100)})</span></div><div class="sub">${c.why === "SL" ? "stop oldu" : c.why} · ${tr(c.ts)}${st.dayStartEquity ? ` · kasanın ${fmt(Math.abs(c.pnl) / st.dayStartEquity * 100, 1)}%'i` : ""}</div></div>`).join("") : '<span class="empty">bugün henüz yok</span>';
+    $("closed").innerHTML = cl.length ? cl.map((c) => `<div class="pos"><div class="top"><b>${c.instId}</b><span class="pl ${c.pnl >= 0 ? "up" : "dn"}">${c.pnl >= 0 ? "+" : ""}${fmt(c.pnl, 3)} USDT</span></div><div class="n">${c.entry} <span class="g">→</span> ${c.exit} <span class="g">(${sign((c.exit / c.entry - 1) * 100)})</span></div><div class="sub">${c.why === "SL" ? "stop" : c.why === "TP" ? "hedef" : c.why} · ${tr(c.ts)}${st.dayStartEquity ? ` · kasanın %${fmt(Math.abs(c.pnl) / st.dayStartEquity * 100, 1)}'i` : ""}</div></div>`).join("") : '<span class="empty">bugün henüz yok</span>';
   }
   $("status").innerHTML = statusText(st, m, d, px);
   decision(m, d);
@@ -277,15 +278,15 @@ async function refresh() {
     if (m.shadow) {
       const sh = m.shadow;
       $("shadow").innerHTML = `<div><div class="n ${cls(sh.pnlPct)}">${sign(sh.pnlPct)}</div><div class="k">kovalayan bot · <b>${sh.trades}</b> işlem</div></div><div><div class="n ${cls(me)}">${sign(me)}</div><div class="k">ben · <b>${st ? st.closed.length : 0}</b> kapanan</div></div>`;
-      $("shadowsub").textContent = sh.trades ? `Aynı veride kırılım kovalayan naif bot: ${sh.wins} kazanan, ${(sh.open || []).length} açık. Emir göndermez, sadece simüle eder.` : "Kırılım kovalayan naif bot aynı veriyi izliyor; henüz sinyal üretmedi.";
+      $("shadowsub").textContent = sh.trades ? `Aynı veride kırılım kovalayan naif bot: ${sh.wins} kazanan, ${(sh.open || []).length} açık. Emir göndermez.` : "Kırılım kovalayan naif bot aynı veriyi izliyor; henüz sinyal yok.";
     }
     const tools = Object.entries(m.byTool || {}).sort((a, b) => b[1] - a[1]);
-    $("mcpn").textContent = `${m.mcpCalls} çağrı · ${tools.length} araç`;
-    $("tools").innerHTML = tools.slice(0, 6).map(([k, v]) => `<div title="${k}">${k.replace(/^(market|account|spot|news|smartmoney)_/, "$1 · ")}</div><div>${v}</div>`).join("") || '<span class="empty">—</span>';
+    $("mcpn").textContent = `${fmt(m.mcpCalls, 0)} çağrı · ${tools.length} araç`;
+    $("tools").innerHTML = tools.slice(0, 3).map(([k, v]) => `<div title="${k}">${k.replace(/^(market|account|spot|news|smartmoney)_/, "$1 · ")}</div><div>${v}</div>`).join("") || '<span class="empty">—</span>';
   }
   const a = d.anchors[0];
-  $("anchn").textContent = d.anchors.length ? `${d.anchors.length} kayıt` : "";
-  $("anchors").innerHTML = a ? `Her karar (ret dahil) hash'lenip zincire yazılır.<br>Son: #${a.seq} · ${a.n} karar · ${tr(a.ts)} · <a href="https://www.oklink.com/xlayer-test/tx/${a.txHash}" target="_blank">${a.txHash.slice(0, 14)}…</a>` : '<span class="empty">henüz kayıt yok</span>';
+  $("anchn").textContent = a ? `${a.seq} kayıt` : "";
+  $("anchors").innerHTML = a ? `Kararlar 15 dakikada bir özetlenip zincire yazılır.<br>Son #${a.seq} · ${a.n} karar · ${tr(a.ts)} · <a href="https://www.oklink.com/xlayer-test/tx/${a.txHash}" target="_blank">zincirde gör</a>` : '<span class="empty">henüz kayıt yok</span>';
   stream(d);
   spark(d.snaps);
 }
@@ -294,6 +295,11 @@ if (STATIC) { $("askq").placeholder = "soru kutusu canlı panelde çalışır (b
 $("stream").addEventListener("click", (ev) => {
   const m = ev.target.closest(".more"); if (!m) return;
   const box = m.closest(".m"); box.querySelector(".short").hidden = true; box.querySelector(".full").hidden = false;
+});
+$("decision").addEventListener("click", (ev) => {
+  const dec = ev.target.closest(".dec"); if (!dec) return;
+  const why = dec.querySelector(".why"), det = dec.querySelector(".detail"), more = dec.querySelector(".more");
+  const open = why.classList.toggle("clip"); if (det) det.hidden = open; more.textContent = open ? "tam gerekçe ve teknik bağlam" : "kısalt";
 });
 $("chips").addEventListener("click", (ev) => {
   const b = ev.target.closest("button"); if (!b) return;
