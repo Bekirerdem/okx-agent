@@ -214,6 +214,7 @@ refresh(); setInterval(refresh, 4000);
 $("askf").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const q = $("askq").value.trim(); if (!q) return;
+  $("askq").value = ""; $("askq").focus();
   $("askb").disabled = true; $("answer").hidden = false; $("answer").innerHTML = `<div class="q">${esc(q)}</div><span class="empty">Seçici düşünüyor…</span>`;
   try {
     const r = await (await fetch("/api/ask", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ q }) })).json();

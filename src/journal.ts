@@ -38,13 +38,13 @@ export function log(kind: Kind, msg: string, data?: Record<string, unknown>): vo
 }
 
 let tgChain: Promise<void> = Promise.resolve();
-export function telegram(text: string): Promise<void> {
+export function telegram(text: string, html = false): Promise<void> {
   if (!TG.token || !TG.chat) return Promise.resolve();
   tgChain = tgChain.then(async () => {
     try {
       await fetch(`https://api.telegram.org/bot${TG.token}/sendMessage`, {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ chat_id: TG.chat, text: text.slice(0, 3900), disable_web_page_preview: true }),
+        body: JSON.stringify({ chat_id: TG.chat, text: text.slice(0, 3900), disable_web_page_preview: true, ...(html ? { parse_mode: "HTML" } : {}) }),
       });
     } catch { /* Telegram düşerse ajan durmaz */ }
     await new Promise((r) => setTimeout(r, 350));
