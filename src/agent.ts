@@ -88,6 +88,7 @@ async function main() {
     const { hm, minutes } = trNow();
     try {
       const b = await getBalance(atk); st.equity = b.totalEq;
+      if (!st.dayStartEquity && b.totalEq > 0) { st.dayStartEquity = b.totalEq; log("info", `gün başı özkaynak belirlendi: ${b.totalEq.toFixed(2)} USDT`); }
       // bekleyen emirler
       for (const [id, p] of Object.entries(st.pending)) {
         const o = await getOrder(atk, id, p.ordId, p.px, p.sz);
