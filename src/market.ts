@@ -116,11 +116,14 @@ export async function getSentiment(atk: Atk, coin: string): Promise<{ score: num
 /** Son N dakikada çıkmış, coin etiketi olan yüksek önemli haberler (haber adayı için). */
 export async function getFreshCoinNews(atk: Atk, withinMin = 45): Promise<{ id: string; title: string; coins: string[]; ts: number }[]> {
   try {
-    const rows: any = await atk.call("news_get_latest", { limit: 30, language: "en-US", importance: "high" });
+    // "high" önemli haberlerde coin etiketi neredeyse hiç yok; tüm akışı alıp somut olay kelimeleriyle ön eleme yapıyoruz, son kararı Karar katmanı verir.
+    const rows: any = await atk.call("news_get_latest", { limit: 50, language: "en-US", importance: "low" });
     const since = Date.now() - withinMin * 60_000;
+    const material = /\b(list(ing|ed|s)?|partner|integrat|mainnet|upgrade|launch|buyback|burn|etf|approv|adopt|acqui|airdrop|grant|treasury|staking|tokeniz)/i;
+    const noise = /\b(analysis|opinion|sentiment|indicator|whale|unstake|address|transfer|rises|falls|surge|drop|dump|pump|profit|yield|market cap|price)\b/i;
     return newsRows(rows)
       .map((r) => ({ id: String(r.id ?? ""), title: String(r.title ?? r.summary ?? ""), coins: (r.ccyList ?? []).map((c: any) => String(c).toUpperCase()), ts: Number(r.cTime ?? 0) }))
-      .filter((n) => n.title && n.coins.length && n.ts >= since);
+      .filter((n) => n.title && n.coins.length && n.ts >= since && material.test(n.title) && !noise.test(n.title));
   } catch { return []; }
 }
 
