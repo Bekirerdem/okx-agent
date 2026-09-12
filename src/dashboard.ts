@@ -23,12 +23,13 @@ function askContext(): string {
   const recent = jsonl("state/journal.jsonl").slice(-40).map((e) => `${String(e.ts).slice(11, 19)}Z ${e.role}·${e.kind}: ${e.msg}${e.data?.reason ? " → " + e.data.reason : ""}`).join(String.fromCharCode(10));
   return [
     `DURUM: kasa ${Number(st.equity ?? 0).toFixed(2)} USDT, gün başı ${Number(st.dayStartEquity ?? 0).toFixed(2)}, açık ${Object.keys(st.positions ?? {}).length}, bekleyen ${Object.keys(st.pending ?? {}).length}, işlem ${st.tradesToday ?? 0}, fren ${st.halted ? "aktif" : "yok"}.`,
-    String(m.lastGate ?? ""), `SON TARAMA: ${m.lastScan ?? ""}`, `KARAR: ${m.lastLlm ?? ""}`, `GÖLGE BOT: ${m.shadow?.summary ?? ""}`, "SON GÜNLÜK:", recent,
+    String(m.lastGate ?? ""), `SON TARAMA: ${m.lastScan ?? ""}`, `KARAR: ${m.lastLlm ?? ""}`, `KOVALAYAN BOT: ${m.shadow?.summary ?? ""}`, "SON GÜNLÜK:", recent,
   ].join(String.fromCharCode(10));
 }
 
 Bun.serve({
   port: PORT,
+  hostname: "127.0.0.1",   // yalnız bu makine; mekân ağındaki başkaları paneli ve /api/ask'i göremez
   async fetch(req) {
     const u = new URL(req.url);
     if (u.pathname === "/api/state") return Response.json(api(), { headers: { "cache-control": "no-store" } });

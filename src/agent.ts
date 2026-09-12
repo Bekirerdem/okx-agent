@@ -99,7 +99,13 @@ async function main() {
     } catch (e) { log("error", `${id} satış başarısız: ${(e as Error).message}`); }
   }
 
+  let busy = false;   // tick 60 sn'yi aşarsa (LLM + onay bekleme) ikinci tick üst üste binmesin: emir/satış tekrarı olmaz
   async function tick() {
+    if (busy) { console.log("tick atlandı: önceki tick sürüyor"); return; }
+    busy = true;
+    try { await tickInner(); } finally { busy = false; }
+  }
+  async function tickInner() {
     const { hm, minutes } = trNow();
     try {
       const b = await getBalance(atk); st.equity = b.totalEq;
