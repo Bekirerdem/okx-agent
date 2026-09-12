@@ -58,6 +58,15 @@ export async function placeOco(atk: Atk, instId: string, sz: string, tpPx: strin
   }
 }
 
+/** Kâr kilidi: borsadaki algo emrinin stop tetik fiyatını yukarı çek. */
+export async function moveStop(atk: Atk, instId: string, newSl: string): Promise<boolean> {
+  if (CFG.dryRun) return true;
+  const algos: any[] = (await atk.call("spot_get_algo_orders", { status: "pending", instId })) ?? [];
+  if (!algos.length) return false;
+  for (const a of algos) await atk.call("spot_amend_algo_order", { instId, algoId: String(a.algoId), newSlTriggerPx: newSl, newSlOrdPx: "-1" });
+  return true;
+}
+
 /** Pozisyon borsa tarafında kapandıysa (hedef ya da stop): son satış fill'lerinden gerçek fiyat ve komisyon. */
 export async function lastSellFill(atk: Atk, instId: string, sinceMs: number): Promise<{ avgPx: number; qty: number; feeUsdt: number } | null> {
   if (CFG.dryRun) return null;

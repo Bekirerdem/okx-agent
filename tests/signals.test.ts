@@ -58,9 +58,11 @@ describe("relStrength / target / book", () => {
     const btc = Array.from({ length: 17 }, (_, i) => mk(1, 1, 1, i === 16 ? 1.01 : 1, i));
     expect(relStrength(coin, btc)).toBeCloseTo(4, 6);
   });
-  test("hedef en az giriş+%0.3", () => {
+  test("hedef en az giriş+%0.3, en fazla giriş+%1.5", () => {
     expect(targetPrice(100, 100.1)).toBeCloseTo(100.3, 6);
     expect(targetPrice(100, 101)).toBe(101);
+    expect(targetPrice(100, 105)).toBeCloseTo(101.5, 6);
+    expect(targetPrice(100, 105, 0.3, 3)).toBeCloseTo(103, 6);
   });
   test("alıcı ağır defter > 1", () => {
     expect(bookImbalance([[100, 10], [99.5, 10]], [[100.1, 2], [100.5, 2]])).toBeGreaterThan(1);

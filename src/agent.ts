@@ -5,7 +5,7 @@ import { Atk } from "./mcp";
 import { getUniverse, getInstruments, getCandles, getLast, getBook, getSmartMoney, getNews, getSentiment, getImportantNews, getFreshCoinNews, type Inst, type Ticker } from "./market";
 import { detectSweep, relStrength, btcGate, dayRangePct, targetPrice, bookImbalance, technicalContext, type Bar } from "./signals";
 import { positionNotional, canOpen, dailyStopHit, stopPrice, roundSize, roundPrice } from "./risk";
-import { getBalance, placeLimitBuy, getOrder, cancelOrder, sellMarket, placeOco, lastSellFill } from "./exchange";
+import { getBalance, placeLimitBuy, getOrder, cancelOrder, sellMarket, placeOco, lastSellFill, moveStop } from "./exchange";
 import { decide, ask, type Candidate } from "./llm";
 import { log, trTime } from "./journal";
 import { flush as anchorFlush, anchorStatus, anchorAddress, pendingCount, lastFlushTs } from "./anchor";
@@ -13,7 +13,7 @@ import { startCommandLoop, getMode, askApproval } from "./commands";
 import { buildReport } from "./report";
 import { emptyShadow, stepShadow, flattenShadow, shadowSummary, type ShadowState } from "./shadow";
 
-type Position = { instId: string; qty: number; entry: number; target: number; sl: number; openedTs: number; openedBucket: number; reason: string; oco?: boolean };
+type Position = { instId: string; qty: number; entry: number; target: number; sl: number; openedTs: number; openedBucket: number; reason: string; oco?: boolean; locked?: boolean };
 type Pending = { instId: string; ordId: string; px: number; sz: number; target: number; sl: number; ts: number; reason: string };
 type State = {
   day: string; dayStartEquity: number; equity: number; halted: boolean; tradesToday: number;
@@ -132,7 +132,7 @@ async function main() {
           const entry = o.avgPx || p.px;
           const base = id.split("-")[0]!;
           const qty = (o.accFillSz || p.sz) + (o.feeCcy === base ? o.fee : 0);   // OKX alış komisyonunu coin cinsinden keser (fee negatif)
-          st.positions[id] = { instId: id, qty, entry, target: targetPrice(entry, p.target, CFG.exit.targetMinPct), sl: p.sl, openedTs: Date.now(), openedBucket: Math.floor(Date.now() / BAR_MS), reason: p.reason, oco: true };
+          st.positions[id] = { instId: id, qty, entry, target: targetPrice(entry, p.target, CFG.exit.targetMinPct, CFG.exit.targetMaxPct), sl: p.sl, openedTs: Date.now(), openedBucket: Math.floor(Date.now() / BAR_MS), reason: p.reason, oco: true };
           delete st.pending[id];
           // dolum fiyatı limitten %0,2'den fazla saparsa hedef ve stop gerçek girişe göre yeniden borsaya konur (STORJ dersi: stop %4 yerine %2,55 kalmıştı)
           if (!CFG.dryRun && Math.abs(entry / p.px - 1) > 0.002) {
@@ -173,7 +173,14 @@ async function main() {
           } catch (e) { log("error", `${id} OCO: ${(e as Error).message?.slice(0, 160)}`); }
         }
         const px = await getLast(atk, id);
-        if (px >= p.target) await closePosition(id, p, "hedef");
+        if (px >= p.target) { await closePosition(id, p, "hedef"); continue; }
+        // kâr kilidi: +%1 görüldü → stop girişin üstüne (borsada). Kârdayken zarara dönmek biter.
+        if (!p.locked && px >= p.entry * (1 + CFG.exit.lockAtPct / 100)) {
+          const newSl = roundPrice(p.entry * (1 + CFG.exit.lockToPct / 100), inst.get(id)?.tickSz ?? 0);
+          try {
+            if (await moveStop(atk, id, String(newSl))) { p.sl = newSl; p.locked = true; saveState(st); log("info", `${id}: kâr kilidi · fiyat ${px} (+${((px / p.entry - 1) * 100).toFixed(2)}%) → stop ${newSl}'e çekildi (giriş +${CFG.exit.lockToPct}%)`, { tg: `<b>KÂR KİLİDİ · ${id}</b>${String.fromCharCode(10)}Fiyat ${px} (${pctOf(px, p.entry)}) → stop ${newSl}, artık zarara dönemez` }); }
+          } catch (e) { log("error", `${id} kâr kilidi: ${(e as Error).message?.slice(0, 120)}`); }
+        }
       }
       // gün sonu ve fren
       if (minutes >= toMin(CFG.session.flat)) {
@@ -316,6 +323,11 @@ ${journal}`);
       return { instId: r.t.instId, close: r.sweep.close, depthPct: r.sweep.depthPct, mid: r.sweep.mid, rs4h: r.rs, dayRangePct: r.range, volUsd: r.t.volUsd, bookImb, smart: smart.get(coin), news, sentiment, ta, source: "dip avı" as const };
     }))).concat(newsEnriched);
 
+    // defter filtresi (kod): satıcı ağır defterde geri dönüş oynanmaz
+    for (const c of cands.filter((x) => x.bookImb < CFG.bookMin)) log("reject", `${c.instId}: emir defteri satıcı ağır (${c.bookImb.toFixed(2)} < ${CFG.bookMin}), Karar katmanına gitmedi`);
+    const kept = cands.filter((x) => x.bookImb >= CFG.bookMin);
+    cands.length = 0; cands.push(...kept);
+    if (!cands.length) return;
     last.cands = cands.map((c) => ({ instId: c.instId, source: c.source ?? "dip avı", close: c.close, depth: +c.depthPct.toFixed(2), mid: c.mid, rs4h: +c.rs4h.toFixed(2), range: +c.dayRangePct.toFixed(2), book: +c.bookImb.toFixed(2), smart: c.smart ? +c.smart.longRatio.toFixed(2) : null, sentiment: c.sentiment?.label ?? null, news: c.news.length, hm, rsi: c.ta?.rsi ?? null, trend: c.ta?.trend ?? null, atr: c.ta?.atrPct ?? null, vwap: c.ta?.vwapDist ?? null, volr: c.ta?.volRatio ?? null }));
     const d = await decide(cands, freeSlots, { btcRetPct: gate.retPct, equity: st.equity, tr: hm });
     last.llm = [`Karar (${d.provider}): ${d.note}`, ...d.picks.map((p) => `✅ ${p.instId}: ${p.reason}`), ...d.rejects.map((p) => `⛔ ${p.instId}: ${p.reason}`)].join(String.fromCharCode(10));
@@ -335,14 +347,14 @@ ${journal}`);
       const sl = roundPrice(stopPrice(px, CFG.risk), i.tickSz);
       if (getMode() === "onaylı") {
         log("info", `${c.instId}: onaylı mod, sahibine soruluyor (60 sn)`);
-        const ok = await askApproval(`${c.instId} al?\n${sz} @ ${px} (${(sz * px).toFixed(2)} USDT) · SL ${sl} · hedef ${targetPrice(px, c.mid, CFG.exit.targetMinPct).toFixed(6)}\nKarar: ${pick.reason}`, 60_000);
+        const ok = await askApproval(`${c.instId} al?\n${sz} @ ${px} (${(sz * px).toFixed(2)} USDT) · SL ${sl} · hedef ${targetPrice(px, c.mid, CFG.exit.targetMinPct, CFG.exit.targetMaxPct).toFixed(6)}\nKarar: ${pick.reason}`, 60_000);
         if (!ok) { log("reject", `${c.instId}: sahibi onaylamadı ya da süre doldu (onaylı mod)`); continue; }
       }
       try {
-        const ordId = await placeLimitBuy(atk, { instId: c.instId, px: String(px), sz: String(sz), slPx: String(sl), tpPx: String(roundPrice(targetPrice(px, c.mid, CFG.exit.targetMinPct), i.tickSz)), clOrdId: `ag${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`.slice(0, 32) });
+        const ordId = await placeLimitBuy(atk, { instId: c.instId, px: String(px), sz: String(sz), slPx: String(sl), tpPx: String(roundPrice(targetPrice(px, c.mid, CFG.exit.targetMinPct, CFG.exit.targetMaxPct), i.tickSz)), clOrdId: `ag${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`.slice(0, 32) });
         st.pending[c.instId] = { instId: c.instId, ordId, px, sz, target: c.mid, sl, ts: Date.now(), reason: (c.source === "haber" ? `[haber: ${c.headline?.slice(0, 80)}] ` : "") + pick.reason };
         st.tradesToday++; if (c.source === "haber") st.newsTradesToday = (st.newsTradesToday ?? 0) + 1;
-        const tgt = targetPrice(px, c.mid, CFG.exit.targetMinPct);
+        const tgt = targetPrice(px, c.mid, CFG.exit.targetMinPct, CFG.exit.targetMaxPct);
         log("entry", `${c.instId} alış emri · ${sz} adet @${px} (${(sz * px).toFixed(2)} USDT, kasanın %${((sz * px) / st.equity * 100).toFixed(1)}'i) · hedef ${tgt.toFixed(4)} (${pctOf(tgt, px)}) · stop ${sl} borsada`, { reason: pick.reason, depth: c.depthPct, book: c.bookImb, source: c.source ?? "dip avı",
           tg: `<b>ALIŞ EMRİ · ${c.instId}</b>${c.source === "haber" ? " · haber adayı" : ""}${String.fromCharCode(10)}${sz} adet @ ${px} (${(sz * px).toFixed(2)} USDT, kasanın %${((sz * px) / st.equity * 100).toFixed(1)}'i)${String.fromCharCode(10)}Hedef ${tgt.toFixed(4)} (${pctOf(tgt, px)}) · stop ${sl} (${pctOf(sl, px)}, borsada)${String.fromCharCode(10)}<i>${H(pick.reason)}</i>` });
       } catch (e) { log("error", `${c.instId} emir: ${(e as Error).message?.slice(0, 200)}`); }

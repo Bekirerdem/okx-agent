@@ -45,9 +45,9 @@ export function dayRangePct(bars: Bar[], sessionStartTs: number): number {
   return ((Math.max(...s.map((b) => b.h)) - Math.min(...s.map((b) => b.l))) / o) * 100;
 }
 
-/** Hedef: aralık ortası, ama en az giriş + minPct. */
-export function targetPrice(entry: number, mid: number, minPct = 0.3): number {
-  return Math.max(mid, entry * (1 + minPct / 100));
+/** Hedef: aralık ortası, ama en az giriş + minPct ve EN FAZLA giriş + maxPct (geri dönüşte küçük, olası kâr alınır). */
+export function targetPrice(entry: number, mid: number, minPct = 0.3, maxPct = 1.5): number {
+  return Math.min(Math.max(mid, entry * (1 + minPct / 100)), entry * (1 + maxPct / 100));
 }
 
 /* ---------- Teknik bağlam: Karar katmanına verilir, tetik DEĞİLDİR (26 haftada tetik olarak hepsi eksi) ---------- */

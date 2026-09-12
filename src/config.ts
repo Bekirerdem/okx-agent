@@ -25,7 +25,14 @@ export const CFG = {
     dailyStopPct: -2.0,  // gün freni
     cooldownBars: 24,    // 2 saat (5m mum)
   },
-  exit: { targetMinPct: 0.3, orderTimeoutSec: 120 },
+  exit: {
+    targetMinPct: 0.3,
+    targetMaxPct: 1.5,     // hedef tavanı: aralık ortası uzaksa +%1,5'te al (09-12 dersi: RAY ve STORJ ikisi de +%2,1 gördü)
+    lockAtPct: 1.0,        // fiyat giriş +%1'e gelince…
+    lockToPct: 0.2,        // …stop girişin +%0,2 üstüne çekilir (kâr kilidi, borsada)
+    orderTimeoutSec: 120,
+  },
+  bookMin: 0.7,            // emir defteri alış/satış oranı bunun altındaysa aday LLM'e gitmez (satıcı ağır defterde geri dönüş oynanmaz)
   llm: { provider: process.env.LLM_PROVIDER ?? "claude", timeoutMs: 75_000 },
   tickMs: 60_000,
   paths: process.argv.includes("--dry-run")
