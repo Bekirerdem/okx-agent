@@ -1,93 +1,141 @@
-# okx-agent — Cumartesi spot piyasasında kaybetmemeyi kovalayan otonom ajan
+# okx-agent
 
-OKX TR Agentic Trading Hackathon, 12 Eylül 2026, Komünite Space. Tek kişi, tek gün, 30 USDT.
+**Kâr kovalamayan, kaybetmemeyi kovalayan otonom spot ajanı.**
+OKX TR Agentic Trading Hackathon, 12 Eylül 2026, Komünite Space. Tek geliştirici, tek gün, 30 USDT gerçek sermaye.
 
-## Tez
+> *An autonomous spot-trading agent for OKX TR. The LLM decides, but only inside a risk cage written in code. Every decision, including every rejection, is journaled, streamed to Telegram, rendered on a live panel, and hash-anchored to X Layer.*
 
-26 haftalık OKX TR 15 dakikalık veride (40 likit parite, 25 Cumartesi) 16 giriş sinyali test edildi.
-Hiçbiri komisyonu (gidiş-dönüş %0,2) güvenilir şekilde yenmedi; kırılım ve göreli güç kovalayan sinyaller eksi.
-Cumartesi spot **geri dönüş piyasası**dır. Bu yüzden ajan kâr kovalamaz, **kaybetmemeyi** kovalar:
+---
 
-- stopları avlanmış coini alır (dip süpürme + içeri yeşil kapanış),
-- 3 saatlik aralığın ortasına dönünce satar,
-- BTC bozulunca nakitte bekler.
+## 1. Problem
 
-**LLM karar verir, ama risk kafesinin içinde. Kafes koddur.**
+Perakende kripto otomasyonunun iki başarısız ucu var. Kural botları hızlı ama kör: haberi okuyamaz, kararını açıklayamaz. LLM botları konuşkan ama tehlikeli: boyutu, stopu ve sermayeyi bir dil modelinin insafına bırakır. Hafta sonu spot piyasası bu ikisini de cezalandırır: hacim hafta içinin dörtte biri, komisyon gidiş-dönüş yüzde 0,2, hareketin çoğu testere.
 
-## Karar döngüsü
+## 2. Ürün
 
-```
-her 60 s  ─► pozisyonları yönet: hedef → sat · 19:15 → hepsini sat · gün freni → hepsini sat, dur
-her 15 dk ─► BTC kapısı ─► evren taraması (≤50 likit USDT paritesi) ─► süpürme adayları
-            ─► zenginleştirme (emir defteri dengesi · smart money · haber)
-            ─► LLM seçici (gerekçeli seç / reddet) ─► risk motoru (boyut, tavan, fren)
-            ─► limit alış + borsada ekli stop ─► karar günlüğü (JSONL · Markdown · Telegram)
-```
+okx-agent üçüncü bir yol kurar: **LLM karar verir, kafes koddur.**
 
-| Katman | Kural |
+- **Ne yapar:** OKX TR spot piyasasında likit 50 pariteyi 15 dakikada bir tarar, stopları avlanmış coini alır, aralığın ortasına dönünce satar, BTC bozulunca nakitte bekler, 19:15'te zorunlu nakde geçer.
+- **LLM'in yetkisi:** aday listesinden seçmek ya da hepsini reddetmek, gerekçesiyle. Haber vetosu. Sahibinin sorularına günlükten cevap.
+- **LLM'in yetkisi olmayan:** pozisyon boyutu, stop mesafesi, BTC kapısı, günlük fren, işlem sayısı. Bunlar config dosyasında sabittir ve prompt'ta görünmez.
+- **Kime değer:** otomasyon isteyen ama sermayesini bir dil modeline teslim etmek istemeyen herkes. Ajanın çıktısı işlem değil, **gerekçeli karar akışı**; işlem onun yan ürünüdür.
+
+## 3. Kanıt
+
+Strateji tahmin değil, ölçüm. Etkinlik öncesi OKX TR'nin 15 dakikalık verisiyle 40 likit paritede 26 hafta (25 Cumartesi) test edildi, komisyon düşülmüş:
+
+| Bulgu | Sonuç |
 |---|---|
-| BTC kapısı | BTC 4 saatlik getiri < −%1 → yeni giriş yok |
-| Giriş | son 15 dk mumu 3 saatlik dibi ≥ %0,3 delip üstüne yeşil kapanmış; göreli güç ≤ +%2; cooldown 2 saat |
-| Boyut | min(özkaynak × %0,5 / %4, özkaynak × %12,5) |
-| Sınırlar | aynı anda ≤ 3 pozisyon, günde ≤ 10 işlem, gün −%2 → fren |
-| Çıkış | hedef = aralık ortası (≥ giriş + %0,3); 19:15 zorunlu nakit; %4 felaket stopu **borsada** |
-| Emir | limit, mum kapanış fiyatı; 120 s içinde dolmazsa iptal |
+| 16 giriş sinyali (RSI, EMA, Bollinger, VWAP, hacim, kırılım, geri test, funding…) | Hiçbiri 1-2 saatlik ufukta komisyonu güvenilir şekilde yenmedi |
+| Kırılım kovalama, hacimli 15 dk mum | Cumartesi başabaş, hafta içi işlem başına −%0,16 |
+| Göreli güç kovalama, en güçlü 3 coini tut | Cumartesi günde ortalama −%1,36 |
+| Dip süpürme + içeri kapanış, aralık ortası hedef | İşlem başına +%0,26, işlemlerin %70'i pozitif |
+| Gün sonucu ↔ BTC'nin günü | Korelasyon 0,43; BTC yeşilken +%0,81, kırmızıyken −%0,43 |
+| Tam risk motoruyla gün simülasyonu | 25 Cumartesi'nin 15'i pozitif, en kötü gün −%0,34, ortalama max DD −%0,24 |
 
-LLM'in yetkisi: adaylar arasından seçmek ya da hepsini reddetmek, gerekçesiyle. Boyut, stop, kapı ve frene erişimi yok.
-LLM cevap vermezse kural motoru derinliğe göre seçer ve günlüğe "LLM çevrimdışı" düşer.
+Çıkarım: hafta sonu spotta kenar sinyalde değil, seçicilikte ve BTC kapısında. Ajan bu ölçümün ürünüdür.
 
-## Mimari
+## 4. Mimari
 
 Beş rol, iki ritim. Her günlük satırı hangi rolün konuştuğunu söyler.
 
-| Rol | İş | Ritim |
+```
+ 60 s ┐  İcracı   pozisyonları yönet: hedef → sat · 19:15 → hepsini sat · fren → hepsini sat, dur
+      │  Hakem    stop takibi · gün freni · özkaynak ölçümü
+15 dk ┤  Gözcü    BTC kapısı → evren (≤50 likit USDT paritesi) → süpürme adayları
+      │  Seçici   emir defteri · smart money · duygu skoru · haber → gerekçeli seç / reddet   [LLM]
+      │  Hakem    boyut · tavanlar · fren                                                     [kod]
+      │  İcracı   limit alış + borsada ekli stop
+      └  Kâtip    JSONL · Markdown · Telegram · X Layer denetim izi
+```
+
+| Rol | Modül | Sorumluluk |
 |---|---|---|
-| Gözcü | BTC kapısı, evren taraması, süpürme adayları | 15 dk |
-| Seçici (LLM) | adayları haber, defter, smart money ile gerekçelendirip seçer/reddeder | 15 dk |
-| Hakem | boyut, tavanlar, gün freni, stop takibi; LLM'in erişemediği kafes | her karar |
-| İcracı | limit alış + ekli stop, iptal, hedefte satış, 19:15 nakit | 60 s |
-| Kâtip | karar günlüğü: JSONL, Markdown, Telegram; gün sonu raporu | her olay |
+| Gözcü | `market.ts`, `signals.ts` | Evren, mumlar, BTC kapısı, süpürme tespiti, göreli güç, defter dengesi |
+| Seçici | `llm.ts` | Adayları zenginleştirilmiş bağlamla gerekçelendirir; `claude -p` → Gemini → kural motoru |
+| Hakem | `risk.ts` | Pozisyon boyutu, tavanlar, günlük fren, lot ve fiyat yuvarlama. Saf fonksiyonlar, birim testli |
+| İcracı | `exchange.ts` | Limit alış + ekli stop, zaman aşımı iptali, hedefte satış, algo iptali. `--dry-run` hiç emir göndermez |
+| Kâtip | `journal.ts`, `anchor.ts`, `report.ts` | Karar günlüğü, Telegram, X Layer, gün sonu raporu |
+| Döngü | `agent.ts` | İki ritim, durum yönetimi, yeniden başlatmada borsayla uzlaştırma |
+| Arayüz | `commands.ts`, `dashboard.ts` | Telegram komutları ve serbest soru; canlı panel |
 
+## 5. Risk kafesi
 
-| Dosya | İş |
-|---|---|
-| `src/mcp.ts` | OKX Agent Trade Kit MCP istemcisi (stdio JSON-RPC). Emir ve hesap sadece buradan. |
-| `src/market.ts` | Evren, mumlar, emir defteri, smart money, haber. REST yedek (anahtarsız, sadece piyasa verisi). |
-| `src/signals.ts` | Saf sinyal fonksiyonları: süpürme, göreli güç, kapı, defter dengesi. Testli. |
-| `src/risk.ts` | Saf risk motoru: boyut, tavanlar, fren, lot yuvarlama. Testli. |
-| `src/llm.ts` | Seçici. `claude -p` → Gemini → kural. |
-| `src/exchange.ts` | Limit alış + ekli SL, iptal, piyasa satış, algo iptali. `--dry-run` hiç emir göndermez. |
-| `src/journal.ts` | Karar günlüğü: `state/journal.jsonl`, `state/journal.md`, Telegram. |
-| `src/agent.ts` | Döngü, durum (`state/state.json`), yeniden başlatmada borsayla uzlaştırma. |
-| `src/report.ts` | Gün sonu performans dökümü (`state/report.md`). |
+| Kural | Değer | Uygulayan |
+|---|---|---|
+| BTC kapısı | 4 saatlik getiri < −%1 → yeni giriş yok | kod |
+| Giriş | son 15 dk mumu 3 saatlik dibi ≥ %0,3 delmiş, üstüne yeşil kapanmış; göreli güç ≤ +%2; cooldown 2 saat | kod |
+| Boyut | min(özkaynak × %0,5 / %4, özkaynak × %12,5) | kod |
+| Sınırlar | aynı anda ≤ 3 pozisyon · günde ≤ 10 işlem · gün −%2 → fren | kod |
+| Stop | %4 altta, emre ekli, **borsa tarafında**; ajan çökse de çalışır | borsa |
+| Çıkış | 3 saatlik aralığın ortası (≥ giriş + %0,3) · 19:15 zorunlu nakit | kod |
+| Emir | limit, mum kapanış fiyatı; 120 s içinde dolmazsa iptal | kod |
+| Seçim ve veto | aday seçimi, haber vetosu, gerekçe | LLM |
 
-Güvenilirlik: durum her adımda diske; yeniden başlatmada bakiye ve pozisyonlar borsadan okunur; MCP çağrıları 3 deneme;
-LLM düşerse kurallar sürer; MCP düşerse yeni emir yok, borsadaki stoplar korur; Telegram düşerse ajan durmaz.
+## 6. OKX Agent Trade Kit entegrasyonu
 
-## Çalıştırma
+Emir ve hesap işlemleri yalnızca ATK MCP sunucusu üzerinden gider (`okx-trade-mcp`, stdio JSON-RPC). Piyasa verisi için anahtarsız REST yedeği vardır; yedek asla emir göndermez. `site = "tr"` ile OKX TR'ye bağlanır; aynı yapılandırma `global` ile OKX Global'e de bağlanır.
+
+| Modül | Araçlar | Kullanım |
+|---|---|---|
+| market | `get_tickers` `get_instruments` `get_candles` `get_ticker` `get_orderbook` | Evren, lot kuralları, 15 dk mumlar, son fiyat, ±%1 defter dengesi |
+| spot | `place_order` (ekli SL) `get_order` `cancel_order` `get_algo_orders` `cancel_algo_order` `get_fills` | Giriş, takip, iptal, stop yönetimi, gerçekleşen işlemler |
+| account | `get_balance` | Özkaynak, kullanılabilir ve dondurulmuş bakiye |
+| news | `get_by_coin` `get_coin_sentiment` `get_latest` | Haber vetosu, duygu skoru, saat başı piyasa notu |
+| smartmoney | `get_signal_overview_by_filter` | Lider trader long oranı, kalabalık uyarısı |
+
+Panel her aracın çağrı sayısını canlı gösterir. Ajan Claude Code'a da MCP sunucusu olarak kayıtlıdır; aynı araçlar sohbette elle çağrılabilir.
+
+## 7. Güvenilirlik ve güvenlik
+
+- **Durum diske:** her adımda `state/state.json`; yeniden başlatmada bakiye ve pozisyonlar borsadan okunup uzlaştırılır.
+- **Bozulma modları:** LLM düşerse kural motoru sürer ve günlüğe "LLM çevrimdışı" düşer. MCP düşerse yeni emir yok, borsadaki stoplar korur. Telegram düşerse ajan durmaz.
+- **Kill switch:** Telegram `/dur` her şeyi satar ve günü kapatır; `/devam` açar.
+- **Kanıtlanmış emir yolu:** canlı alt hesapta alış, ekli stop, stop iptali, satış, zaman aşımı iptali uçtan uca test edildi (`scripts/smoke.ts`).
+- **Yetki:** API anahtarı yalnızca okuma ve al-sat; çekim ve transfer kapalı. Anahtarlar `~/.okx/config.toml`'da, repoda değil.
+- **Test:** `bun test`, sinyal ve risk motoru için 19 birim testi; `tsc --noEmit` sıfır hata.
+
+## 8. Etkileşim
+
+**Telegram** (yalnız sahibinin sohbeti):
+`/durum` · `/pozisyon` anlık kâr/zarar · `/adaylar` son tarama ve Seçici'nin gerekçeleri · `/neden COIN` · `/kurallar` · `/rapor` · `/dur` · `/devam` · `/zincir`.
+Komut olmayan her mesaj Seçici'ye sorudur: "sabahtan beri neden işlem açmadın" gibi. Cevap günlük bağlamından gelir, uydurma yoktur.
+
+**Panel** (`bun run dashboard`, http://localhost:8787): özkaynak ve gün içi eğri, kapı durumu, sayaçlar, risk kafesi, rol etiketli karar akışı, Seçici'nin son kararı, pozisyonlar, kapanan işlemler, MCP araç defteri, X Layer kayıtları. 4 saniyede bir yenilenir.
+
+## 9. Denetim izi
+
+Her 15 dakikada karar günlüğü batch'i SHA-256 ile hash'lenir ve X Layer testnet'e (chain 1952) sıfır değerli bir işlemin data alanına yazılır. `state/anchors.jsonl` batch dosyasını ve tx hash'ini tutar. Günlük sonradan değiştirilemez; jüri zincirdeki hash ile dosyadaki batch'i karşılaştırabilir. Gaz biterse modül kendini kapatır, ajan etkilenmez.
+
+## 10. Çalıştırma
 
 ```
 bun install
-cp .env.example .env        # TG_BOT_TOKEN, TG_CHAT_ID, LLM_PROVIDER
-okx config init             # ~/.okx/config.toml → [profiles.live] site="tr"
-bun test                    # sinyal + risk testleri
-bun run dry                 # emir göndermeden tam döngü
-bun run agent               # canlı
-bun run report              # performans dökümü
+cp .env.example .env            # TG_BOT_TOKEN, TG_CHAT_ID, LLM_PROVIDER, ANCHOR_*
+okx config init                 # ~/.okx/config.toml → [profiles.live] site = "tr"
+bun test                        # sinyal + risk testleri
+bun run dry                     # emir göndermeden tam döngü
+bun run agent                   # canlı (basla.bat)
+bun run dashboard               # panel (panel.bat)
+bun run report                  # performans dökümü
 ```
 
-## Etkileşim
+Gereksinimler: Bun ≥ 1.3, Node ≥ 18 (ATK için), `@okx_ai/okx-trade-mcp` ve `@okx_ai/okx-trade-cli` global kurulu, Claude Code veya Gemini API anahtarı.
 
-Telegram (sadece sahibin sohbeti): `/durum` · `/pozisyon` (anlık kâr/zarar) · `/adaylar` (son tarama + Seçici'nin gerekçeleri) ·
-`/neden COIN` (günlükten o coinin kararları) · `/kurallar` · `/rapor` · `/dur` (acil fren, hepsini sat) · `/devam` · `/zincir` (X Layer izi).
-Panel: `bun run dashboard` → http://localhost:8787 (canlı karar akışı, pozisyonlar, özkaynak, MCP araç defteri, zincir kayıtları).
+## 11. Sınırlar ve yol haritası
 
-## Denetim izi (X Layer)
+- 26 haftalık kanıt, hafta sonu spot rejimine özgüdür; hafta içi aynı sinyal negatiftir. Ajan gün tipini bilir, kural setini buna göre taşımaz.
+- Sermaye 30 USDT; boyutlama yüzdeyle çalışır, büyüdükçe aynı kurallar geçerlidir.
+- Sırada: kırılım kovalayan gölge botla canlı karşılaştırma, insan-döngüde onaylı mod, OKX Global ve Bitget adaptörleri, gün sonu LLM post-mortem'i.
 
-Her 15 dakikada karar günlüğü batch'i SHA-256 ile hash'lenir ve X Layer testnet'e (chain 1952) sıfır değerli işlemin data alanına yazılır.
-`state/anchors.jsonl` tx hash + batch dosyasını tutar; günlük sonradan değiştirilemez. Gaz yoksa modül kendini kapatır, ajan etkilenmez.
+## 12. Dizin
 
-## Araştırma
+```
+src/        agent · market · signals · risk · llm · exchange · journal · anchor · commands · dashboard · report
+tests/      signals.test.ts · risk.test.ts
+scripts/    smoke.ts (canlı emir yolu testi) · anchor_test.ts
+docs/       spec.md (tasarım kararları)
+state/      günlük, durum, rapor, zincir kayıtları (git dışı)
+```
 
-`docs/spec.md` tasarım; strateji araştırması (6 ve 26 haftalık faktör testleri, gün simülasyonları) etkinlik öncesi
-yapıldı ve sunumda tablo olarak gösterildi. Ajanın kendisi etkinlik günü sıfırdan yazıldı.
+Geliştirici: Bekir Erdem · github.com/Bekirerdem · Lisans: MIT
