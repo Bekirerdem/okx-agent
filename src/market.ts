@@ -95,3 +95,23 @@ export async function getNews(atk: Atk, coin: string): Promise<string[]> {
     return (rows ?? []).map((r) => String(r.title ?? r.headline ?? "")).filter(Boolean);
   } catch { return []; }
 }
+
+/** Coin duygu skoru (OKX news). Hata olursa null. */
+export async function getSentiment(atk: Atk, coin: string): Promise<{ score: number; label: string } | null> {
+  try {
+    const rows: any = await atk.call("news_get_coin_sentiment", { coins: coin, period: "24h" });
+    const r = Array.isArray(rows) ? rows[0] : rows;
+    if (!r) return null;
+    const score = Number(r.score ?? r.sentimentScore ?? r.sentiment ?? NaN);
+    const label = String(r.label ?? r.sentimentLabel ?? (score > 0.2 ? "bullish" : score < -0.2 ? "bearish" : "neutral"));
+    return isNaN(score) ? { score: 0, label } : { score, label };
+  } catch { return null; }
+}
+
+/** Son 3 saatin yüksek önemli piyasa haberleri (saat başı rejim notu için). */
+export async function getImportantNews(atk: Atk, limit = 5): Promise<string[]> {
+  try {
+    const rows: any[] = await atk.call("news_get_important", { limit, language: "en-US", begin: Date.now() - 3 * 3600_000 });
+    return (rows ?? []).map((r) => String(r.title ?? "")).filter(Boolean);
+  } catch { return []; }
+}

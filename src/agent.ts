@@ -2,7 +2,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { CFG } from "./config";
 import { Atk } from "./mcp";
-import { getUniverse, getInstruments, getCandles, getLast, getBook, getSmartMoney, getNews, type Inst, type Ticker } from "./market";
+import { getUniverse, getInstruments, getCandles, getLast, getBook, getSmartMoney, getNews, getSentiment, getImportantNews, type Inst, type Ticker } from "./market";
 import { detectSweep, relStrength, btcGate, dayRangePct, targetPrice, bookImbalance, type Bar } from "./signals";
 import { positionNotional, canOpen, dailyStopHit, stopPrice, roundSize, roundPrice } from "./risk";
 import { getBalance, placeLimitBuy, getOrder, cancelOrder, sellMarket } from "./exchange";
@@ -184,6 +184,10 @@ async function main() {
     log("scan", `${hm}: BTC 4h ${gate.retPct.toFixed(2)}% → kapı ${gate.open ? "AÇIK" : "KAPALI"} | ${universe.length} parite tarandı | ${raw.length} süpürme adayı${skipped.length ? " | elenen " + skipped.length : ""}`,
       { candidates: raw.map((r) => `${r.t.instId} d${r.sweep.depthPct.toFixed(2)}`), skipped: skipped.slice(0, 12) });
 
+    if (hm.endsWith(":00")) {
+      const heads = await getImportantNews(atk, 4);
+      if (heads.length) log("info", `${hm} piyasa notu (OKX news, yüksek önem): ${heads.map((h) => "• " + h.slice(0, 90)).join(" ")}`);
+    }
     if (!gate.open) { log("gate", `KAPI KAPALI: BTC 4 saatte ${gate.retPct.toFixed(2)}%. ${raw.length} aday reddedildi, nakitte bekliyorum.`, { reason: "BTC düşerken long-only spotta risk bütçesi sıfır" }); return; }
     if (!raw.length) return;
     if (!slots.ok) { log("reject", `${raw.length} aday var ama giriş yok: ${slots.why}`); return; }
@@ -194,8 +198,10 @@ async function main() {
     const cands: Candidate[] = await Promise.all(top.map(async (r) => {
       let bookImb = 1; let news: string[] = [];
       try { const bk = await getBook(atk, r.t.instId, 20); bookImb = bookImbalance(bk.bids, bk.asks, 1.0); } catch { /* */ }
-      news = await getNews(atk, r.t.instId.split("-")[0]!);
-      return { instId: r.t.instId, close: r.sweep.close, depthPct: r.sweep.depthPct, mid: r.sweep.mid, rs4h: r.rs, dayRangePct: r.range, volUsd: r.t.volUsd, bookImb, smart: smart.get(r.t.instId.split("-")[0]!), news };
+      const coin = r.t.instId.split("-")[0]!;
+      news = await getNews(atk, coin);
+      const sentiment = await getSentiment(atk, coin);
+      return { instId: r.t.instId, close: r.sweep.close, depthPct: r.sweep.depthPct, mid: r.sweep.mid, rs4h: r.rs, dayRangePct: r.range, volUsd: r.t.volUsd, bookImb, smart: smart.get(coin), news, sentiment };
     }));
 
     const d = await decide(cands, freeSlots, { btcRetPct: gate.retPct, equity: st.equity, tr: hm });

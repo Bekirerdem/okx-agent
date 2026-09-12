@@ -6,7 +6,7 @@ import { CFG } from "./config";
 
 export type Candidate = {
   instId: string; close: number; depthPct: number; mid: number; rs4h: number; dayRangePct: number; volUsd: number;
-  bookImb: number; smart?: { longRatio: number; traders: number; vs24h: number }; news: string[];
+  bookImb: number; smart?: { longRatio: number; traders: number; vs24h: number }; news: string[]; sentiment?: { score: number; label: string } | null;
 };
 export type Decision = { picks: { instId: string; reason: string }[]; rejects: { instId: string; reason: string }[]; note: string; provider: string };
 
@@ -16,6 +16,7 @@ function prompt(cands: Candidate[], freeSlots: number, ctx: { btcRetPct: number;
     day_range_pct: +c.dayRangePct.toFixed(2), vol24h_usd_m: +(c.volUsd / 1e6).toFixed(1), book_bid_ask_ratio_1pct: +c.bookImb.toFixed(2),
     smart_money: c.smart ? { long_ratio: +c.smart.longRatio.toFixed(2), traders: c.smart.traders, vs24h: +c.smart.vs24h.toFixed(2) } : null,
     news_6h_high: c.news.slice(0, 3),
+    sentiment_24h: c.sentiment ? `${c.sentiment.label} (${c.sentiment.score})` : null,
   }));
   return `Sen bir spot kripto trading ajanının SEÇİCİ katmanısın. Cumartesi, OKX TR, long-only, saat ${ctx.tr} (TR).
 Tez: Cumartesi geri dönüş piyasası; stopları avlanmış (dip süpürme + içeri yeşil kapanış) coin alınır, 3 saatlik aralığın ortasına dönünce satılır.
