@@ -88,6 +88,9 @@
     <div class="label">Risk kafesi · kod, LLM erişemez</div>
     <div class="cage">işlem başı risk <b>%0,5</b> · stop <b>%4</b> borsada<br>pozisyon tavanı <b>%12,5</b> · aynı anda <b>≤3</b><br>günde <b>≤10</b> işlem · gün freni <b>−%2</b><br>BTC 4h &lt; <b>−%1</b> → giriş yok · <b>19:15</b> nakit</div>
 
+    <div class="label">Gölge bot · kırılım kovalayan, simülasyon</div>
+    <div class="kv" id="shadow"><div class="empty">henüz sinyal yok</div></div>
+
     <div class="label">ATK MCP araç defteri</div>
     <div class="tools" id="tools"></div>
 
@@ -149,6 +152,10 @@ async function refresh() {
     $("gate").className = "gate " + (/AÇIK/.test(m.lastGate || "") ? "open" : /KAPALI/.test(m.lastGate || "") ? "closed" : "");
     $("scan").textContent = m.lastScan || "—";
     $("llm").innerHTML = m.lastLlm ? `<div class="h">${esc(m.lastLlm.split("\n")[0])}</div>${esc(m.lastLlm.split("\n").slice(1).join("\n")) || '<span class="empty">seçim yok</span>'}` : '<span class="empty">henüz aday oluşmadı</span>';
+    if (m.shadow) {
+      const sh = m.shadow; const me = st?.dayStartEquity ? (st.equity / st.dayStartEquity - 1) * 100 : 0;
+      $("shadow").innerHTML = [["kovalayan bot", `<span class="${sh.pnlPct > 0 ? "up" : sh.pnlPct < 0 ? "dn" : ""}">${sh.pnlPct > 0 ? "+" : ""}${fmt(sh.pnlPct)}%</span>`], ["ben", `<span class="${me > 0.005 ? "up" : me < -0.005 ? "dn" : ""}">${me > 0 ? "+" : ""}${fmt(me)}%</span>`], ["gölge işlem / kazanan", `${sh.trades} / ${sh.wins}`], ["gölge açık", (sh.open || []).map((p) => p.instId).join(", ") || "—"]].map(([k, v]) => `<div>${k}</div><div>${v}</div>`).join("");
+    }
     const tools = Object.entries(m.byTool || {}).sort((a, b) => b[1] - a[1]); const mx = tools[0]?.[1] || 1;
     $("tools").innerHTML = tools.map(([k, v]) => `<div><div class="n" title="${k}">${k.replace(/^(market|account|spot|news|smartmoney)_/, "$1 · ")}</div><div class="bar"><i style="width:${(v / mx) * 100}%"></i></div></div><div>${v}</div>`).join("") || '<span class="empty">—</span>';
   }

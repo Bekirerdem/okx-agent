@@ -11,6 +11,7 @@ import { log, trTime } from "./journal";
 import { flush as anchorFlush, anchorStatus, anchorAddress } from "./anchor";
 import { startCommandLoop } from "./commands";
 import { buildReport } from "./report";
+import { emptyShadow, stepShadow, flattenShadow, shadowSummary, type ShadowState } from "./shadow";
 
 type Position = { instId: string; qty: number; entry: number; target: number; sl: number; openedTs: number; openedBucket: number; reason: string };
 type Pending = { instId: string; ordId: string; px: number; sz: number; target: number; sl: number; ts: number; reason: string };
@@ -18,7 +19,7 @@ type State = {
   day: string; dayStartEquity: number; equity: number; halted: boolean; tradesToday: number;
   positions: Record<string, Position>; pending: Record<string, Pending>; cooldown: Record<string, number>; seen: Record<string, number>;
   closed: { instId: string; entry: number; exit: number; qty: number; pnl: number; why: string; ts: number }[];
-  lastBucket: number; postmortem?: boolean;
+  lastBucket: number; postmortem?: boolean; shadow: ShadowState;
 };
 
 const BAR_MS = 15 * 60_000;
@@ -38,9 +39,9 @@ function sessionStartTs(): number {
 function loadState(day: string): State {
   if (existsSync(CFG.paths.state)) {
     const s: State = JSON.parse(readFileSync(CFG.paths.state, "utf-8"));
-    if (s.day === day) return s;
+    if (s.day === day) { s.shadow ??= emptyShadow(); return s; }
   }
-  return { day, dayStartEquity: 0, equity: 0, halted: false, tradesToday: 0, positions: {}, pending: {}, cooldown: {}, seen: {}, closed: [], lastBucket: 0 };
+  return { day, dayStartEquity: 0, equity: 0, halted: false, tradesToday: 0, positions: {}, pending: {}, cooldown: {}, seen: {}, closed: [], lastBucket: 0, shadow: emptyShadow() };
 }
 function saveState(s: State) { mkdirSync("state", { recursive: true }); writeFileSync(CFG.paths.state, JSON.stringify(s, null, 1)); }
 function saveMetrics(m: Record<string, unknown>) { try { writeFileSync("state/metrics.json", JSON.stringify(m)); } catch { /* */ } }
@@ -124,6 +125,12 @@ async function main() {
       // gün sonu ve fren
       if (minutes >= toMin(CFG.session.flat)) {
         if (Object.keys(st.positions).length || Object.keys(st.pending).length) { await flattenAll("gün sonu"); log("flat", `${hm}: zorunlu nakit tamam. Gün getirisi ${((st.equity / st.dayStartEquity - 1) * 100).toFixed(2)}%`); }
+        if (Object.keys(st.shadow.open).length) {
+          const px: Record<string, number> = {};
+          for (const id of Object.keys(st.shadow.open)) px[id] = await getLast(atk, id).catch(() => 0) || st.shadow.open[id]!.entry;
+          st.shadow = flattenShadow(st.shadow, px, Date.now());
+          log("info", `gün sonu ${shadowSummary(st.shadow, st.dayStartEquity)} | ben: ${((st.equity / st.dayStartEquity - 1) * 100).toFixed(2)}%`);
+        }
         if (!st.postmortem) {
           st.postmortem = true; saveState(st);
           try {
@@ -144,13 +151,14 @@ ${journal}`);
         if (minutes >= toMin(CFG.session.start) && minutes < toMin(CFG.session.flat)) await onBarClose();
         else log("info", `${hm}: seans dışı, sadece izleme`);
       }
-      if (minutes % 15 === 0) log("snapshot", `özkaynak ${st.equity.toFixed(2)} USDT (${((st.equity / st.dayStartEquity - 1) * 100).toFixed(2)}%) | açık ${Object.keys(st.positions).length} | bekleyen ${Object.keys(st.pending).length} | işlem ${st.tradesToday} | MCP çağrı ${atk.calls} hata ${atk.errors}`);
+      if (minutes % 15 === 0) log("snapshot", `özkaynak ${st.equity.toFixed(2)} USDT (${((st.equity / st.dayStartEquity - 1) * 100).toFixed(2)}%) | açık ${Object.keys(st.positions).length} | bekleyen ${Object.keys(st.pending).length} | işlem ${st.tradesToday} | MCP çağrı ${atk.calls} hata ${atk.errors} | ${shadowSummary(st.shadow, st.dayStartEquity)}`);
       if (minutes % 15 === 0) { const a = await anchorFlush(); if (a) log("info", `X Layer denetim izi: ${a.n} karar → ${a.root.slice(0, 18)}… ${a.url}`); }
     } catch (e) {
       log("error", `tick: ${(e as Error).message?.slice(0, 200)}`);
     }
     saveState(st);
-    saveMetrics({ ts: Date.now(), mode: CFG.dryRun ? "dry" : "live", mcpCalls: atk.calls, mcpErrors: atk.errors, byTool: atk.byTool, lastScan: last.scan, lastGate: last.gate, lastLlm: last.llm, anchor: anchorStatus(), universe: universe.length, llm: CFG.llm.provider });
+    saveMetrics({ ts: Date.now(), mode: CFG.dryRun ? "dry" : "live", mcpCalls: atk.calls, mcpErrors: atk.errors, byTool: atk.byTool, lastScan: last.scan, lastGate: last.gate, lastLlm: last.llm, anchor: anchorStatus(), universe: universe.length, llm: CFG.llm.provider,
+      shadow: { summary: shadowSummary(st.shadow, st.dayStartEquity), pnlPct: st.dayStartEquity ? (st.shadow.pnlUsdt / st.dayStartEquity) * 100 : 0, trades: st.shadow.trades, wins: st.shadow.wins, open: Object.values(st.shadow.open), closed: st.shadow.closed.slice(-8) } });
   }
 
   async function onBarClose() {
@@ -175,6 +183,7 @@ ${journal}`);
         const t = queue[idx++]!;
         try {
           const bars = await getCandles(atk, t.instId, 40);
+          st.shadow = stepShadow(st.shadow, t.instId, bars, st.equity, Date.now());   // gölge bot: kovalayan naif strateji, emir yok
           const sweep = detectSweep(bars, CFG.entry.lookback, CFG.entry.minDepthPct);
           if (!sweep) continue;
           const sigTs = bars[bars.length - 1]!.ts;

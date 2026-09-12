@@ -40,8 +40,9 @@ async function handle(text: string, ctx: CmdCtx): Promise<string> {
   switch ((cmd ?? "").toLowerCase().split("@")[0]) {
     case "/start": case "/yardim": case "/yardım": case "/help": return HELP;
     case "/durum":
-      const hb = (() => { try { const m = JSON.parse(readFileSync("state/metrics.json", "utf-8")); return Math.round((Date.now() - m.ts) / 1000); } catch { return -1; } })();
-      return `📊 Özkaynak ${s.equity.toFixed(2)} USDT (${pct}%) · nabız ${hb >= 0 ? hb + " sn önce" : "?"}\n${s.lastGate || "kapı: henüz tarama yok"}\nAçık ${s.positions.length} · bekleyen ${s.pending.length} · işlem ${s.trades}/${CFG.risk.maxTradesPerDay}\nFren: ${s.halted ? "AKTİF" : "yok"}\nMCP çağrı ${s.mcpCalls}, hata ${s.mcpErrors}\nSon tarama: ${s.lastScan || "-"}`;
+      const met = (() => { try { return JSON.parse(readFileSync("state/metrics.json", "utf-8")); } catch { return null; } })();
+      const hb = met ? Math.round((Date.now() - met.ts) / 1000) : -1;
+      return `📊 Özkaynak ${s.equity.toFixed(2)} USDT (${pct}%) · nabız ${hb >= 0 ? hb + " sn önce" : "?"}${met?.shadow ? "\n🪞 " + met.shadow.summary : ""}\n${s.lastGate || "kapı: henüz tarama yok"}\nAçık ${s.positions.length} · bekleyen ${s.pending.length} · işlem ${s.trades}/${CFG.risk.maxTradesPerDay}\nFren: ${s.halted ? "AKTİF" : "yok"}\nMCP çağrı ${s.mcpCalls}, hata ${s.mcpErrors}\nSon tarama: ${s.lastScan || "-"}`;
     case "/pozisyon": {
       if (!s.positions.length && !s.pending.length) return "Açık pozisyon yok. Nakitteyim.";
       const rows: string[] = [];
