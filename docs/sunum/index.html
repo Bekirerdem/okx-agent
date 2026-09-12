@@ -194,6 +194,7 @@ const S = [...document.querySelectorAll("section")]; let i = Math.max(0, Math.mi
 const show = () => { S.forEach((s, k) => s.classList.toggle("on", k === i)); location.hash = i + 1; };
 addEventListener("keydown", (e) => { if (["ArrowRight", " ", "PageDown"].includes(e.key)) { i = Math.min(S.length - 1, i + 1); show(); } if (["ArrowLeft", "PageUp"].includes(e.key)) { i = Math.max(0, i - 1); show(); } });
 addEventListener("click", (e) => { if (e.target.closest("a")) return; i = e.clientX > innerWidth / 2 ? Math.min(S.length - 1, i + 1) : Math.max(0, i - 1); show(); });
+addEventListener("hashchange", () => { const k = (Number(location.hash.slice(1)) || 1) - 1; if (k !== i && k >= 0 && k < S.length) { i = k; show(); } });
 show();
 </script>
 </body>
