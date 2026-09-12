@@ -7,191 +7,170 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
-  /* Panelle aynı DNA: kağıt, mürekkep, tek amber vurgu, mono sayılar. Tuşlar: → ← boşluk. Yazdır: her slayt bir sayfa. */
+  /* DESIGN DNA — panelle aynı kağıt / mürekkep / tek amber. 5 slayt, 2 dakika: slayt başına birkaç kelime, sayılar büyük, konuşmayı Bekir yapar.
+     STAGE    1920×1080 sabit, pencereye ölçeklenir (projektörde ne görüyorsan o) · kenar 96px
+     TYPE     kicker JetBrains Mono 800 20px .18em amber · başlık Instrument Sans 700 72px · sayılar JetBrains Mono 800 · en küçük metin 24px
+     LAYOUTS  KAPAK · HAT (5 sütun, LLM amber) · KOMUT (liste + üç cümle) · SAYI (altı büyük sayı + kıyas + üç olay) · EKRAN (tam görsel)
+     THE MOVE kapakta ad 240px, sayı slaytında sayılar 120px
+     REFUSALS gradient yok · gölge yok · ikon ve emoji yok · kart yok · madde işareti yok · tablo yok · "hedef %x / stop %y" yok · slayt başına ≤ 2 amber
+     TUŞLAR   → ← boşluk · adres çubuğunda #3 · yazdır: her slayt bir sayfa */
   :root { --bg:#f5f2ea; --ink:#14171c; --muted:#5b6270; --acc:#c2410c; --up:#15803d; --dn:#b91c1c; --line:#d9d3c4; --soft:#ece8dd; }
   * { box-sizing:border-box; margin:0; padding:0; }
-  html,body { height:100%; background:var(--bg); color:var(--ink); font-family:"Instrument Sans",system-ui,sans-serif; }
-  .mono { font-family:"JetBrains Mono",ui-monospace,monospace; }
-  section { display:none; position:fixed; inset:0; padding:64px 88px 72px; flex-direction:column; }
-  section.on { display:flex; }
-  .kicker { font-family:"JetBrains Mono"; font-size:15px; font-weight:800; letter-spacing:.18em; text-transform:uppercase; color:var(--acc); padding-bottom:14px; border-bottom:2px solid var(--ink); margin-bottom:36px; }
-  h1 { font-size:64px; font-weight:700; letter-spacing:-.025em; line-height:1.05; }
-  h2 { font-size:48px; font-weight:700; letter-spacing:-.02em; line-height:1.1; margin-bottom:28px; }
-  p, li { font-size:27px; line-height:1.4; }
-  ul { list-style:none; } li { padding:12px 0; border-top:1px solid var(--line); } li:first-child { border-top:0; }
-  li b { font-weight:700; } .g { color:var(--muted); } .acc { color:var(--acc); } .up { color:var(--up); } .dn { color:var(--dn); }
-  .sub { font-size:26px; color:var(--muted); margin-top:20px; line-height:1.4; }
-  .foot { position:absolute; left:88px; right:88px; bottom:28px; display:flex; justify-content:space-between; font-family:"JetBrains Mono"; font-size:14px; color:var(--muted); letter-spacing:.08em; }
-  .big { font-family:"JetBrains Mono"; font-weight:800; font-size:96px; letter-spacing:-.04em; line-height:1; }
-  .cols { display:grid; grid-template-columns:1fr 1fr; gap:0 64px; }
-  .num { display:grid; grid-template-columns:repeat(3,1fr); gap:28px 40px; margin-top:8px; }
-  .num .n { font-family:"JetBrains Mono"; font-weight:800; font-size:64px; letter-spacing:-.04em; line-height:1; }
-  .num .k { font-size:20px; color:var(--muted); margin-top:8px; line-height:1.3; }
-  .flow { display:grid; grid-template-columns:repeat(5,1fr); gap:20px; flex:1; }
-  .flow > div { border-top:4px solid var(--ink); padding-top:14px; }
-  .flow .t { font-family:"JetBrains Mono"; font-weight:800; font-size:22px; letter-spacing:.06em; text-transform:uppercase; }
-  .flow .t small { display:block; font-size:13px; letter-spacing:.14em; color:var(--muted); margin-top:4px; }
-  .flow .t.llm { color:var(--acc); }
-  .flow p { font-size:19px; color:var(--muted); margin-top:12px; line-height:1.45; } .flow p b { color:var(--ink); font-weight:600; }
-  table { width:100%; border-collapse:collapse; font-size:23px; }
-  th { font-family:"JetBrains Mono"; font-size:14px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); text-align:left; padding:0 16px 10px 0; border-bottom:2px solid var(--ink); }
-  td { padding:12px 16px 12px 0; border-bottom:1px solid var(--line); vertical-align:top; } td.mono, td code { font-family:"JetBrains Mono"; font-size:20px; }
-  .shot { flex:1; min-height:0; display:flex; flex-direction:column; }
-  .shot img { flex:1; min-height:0; width:100%; object-fit:contain; object-position:top left; border:2px solid var(--ink); }
-  .cmd { display:grid; grid-template-columns:200px 1fr; gap:8px 20px; font-size:22px; }
-  .cmd code { font-family:"JetBrains Mono"; font-weight:700; }
-  .cmd .g { color:var(--muted); }
-  @media print { section { display:flex !important; position:relative; height:100vh; page-break-after:always; } }
+  html,body { height:100%; background:var(--bg); color:var(--ink); font-family:"Instrument Sans",system-ui,sans-serif; overflow:hidden; }
+  #deck { position:fixed; inset:0; }
+  .stage { width:1920px; height:1080px; position:absolute; left:50%; top:50%; transform-origin:center center; display:none; flex-direction:column; padding:88px 96px 80px; text-wrap:pretty; }
+  .stage.on { display:flex; }
+  .kicker { font-family:"JetBrains Mono"; font-size:20px; font-weight:800; letter-spacing:.18em; text-transform:uppercase; color:var(--acc); padding-bottom:18px; border-bottom:2px solid var(--ink); margin-bottom:56px; display:flex; justify-content:space-between; gap:40px; }
+  .kicker span + span { color:var(--muted); text-align:right; }
+  h1 { font-family:"JetBrains Mono"; font-weight:800; font-size:240px; letter-spacing:-.05em; line-height:.9; margin-left:-12px; }
+  h2 { font-size:72px; font-weight:700; letter-spacing:-.025em; line-height:1.08; text-wrap:balance; margin-bottom:56px; }
+  b { font-weight:700; }
+  .dn { color:var(--dn); } .g { color:var(--muted); }
+  .foot { position:absolute; left:96px; right:96px; bottom:36px; display:flex; justify-content:space-between; font-family:"JetBrains Mono"; font-size:18px; color:var(--muted); letter-spacing:.06em; }
+
+  /* KAPAK */
+  .lead { font-size:52px; line-height:1.25; margin-top:48px; max-width:1500px; letter-spacing:-.01em; }
+  .thesis { margin-top:auto; margin-bottom:36px; display:grid; grid-template-columns:repeat(3,1fr); gap:0 48px; }
+  .thesis div { border-top:4px solid var(--ink); padding-top:22px; font-size:44px; font-weight:600; letter-spacing:-.015em; line-height:1.15; }
+  .thesis small { display:block; font-family:"JetBrains Mono"; font-size:18px; font-weight:700; letter-spacing:.16em; color:var(--muted); margin-bottom:12px; }
+
+  /* HAT */
+  .hat { display:grid; grid-template-columns:repeat(5,1fr); gap:0 40px; }
+  .hat > div { border-top:4px solid var(--ink); padding-top:22px; }
+  .hat .num { font-family:"JetBrains Mono"; font-weight:800; font-size:88px; letter-spacing:-.04em; line-height:1; color:var(--muted); }
+  .hat .llm .num { color:var(--acc); }
+  .hat .role { font-family:"JetBrains Mono"; font-weight:800; font-size:28px; letter-spacing:.08em; text-transform:uppercase; margin-top:14px; }
+  .hat .role small { display:block; font-size:16px; font-weight:700; letter-spacing:.14em; color:var(--muted); margin-top:6px; }
+  .hat p { font-size:26px; line-height:1.4; margin-top:18px; }
+  .proof { margin-top:auto; border-top:1px solid var(--line); padding-top:26px; font-size:30px; line-height:1.35; }
+
+  /* KOMUT */
+  .cols { display:grid; grid-template-columns:1.35fr 1fr; gap:0 96px; }
+  .cmd { display:grid; grid-template-columns:270px 1fr; gap:11px 32px; align-content:start; }
+  .cmd code { font-family:"JetBrains Mono"; font-weight:700; font-size:27px; letter-spacing:-.01em; padding-top:2px; }
+  .cmd span { font-size:26px; line-height:1.3; }
+  .side { display:grid; gap:34px; align-content:start; }
+  .side div { border-top:3px solid var(--ink); padding-top:16px; font-size:25px; line-height:1.4; color:var(--muted); }
+  .side b { display:block; font-size:32px; color:var(--ink); margin-bottom:6px; letter-spacing:-.015em; }
+
+  /* SAYI */
+  .nums { display:grid; grid-template-columns:repeat(6,1fr); gap:0 36px; }
+  .nums > div { border-top:4px solid var(--ink); padding-top:20px; }
+  .n { font-family:"JetBrains Mono"; font-weight:800; font-size:120px; letter-spacing:-.05em; line-height:1; white-space:nowrap; }
+  .n small { font-size:40px; font-weight:700; letter-spacing:0; margin:0 10px 0 4px; color:var(--muted); }
+  .k { font-size:24px; color:var(--muted); margin-top:16px; line-height:1.3; }
+  .duel { display:grid; grid-template-columns:1fr 1fr 1.6fr; gap:0 36px; margin-top:auto; align-items:end; }
+  .duel .n { font-size:88px; }
+  .duel .k { margin-top:10px; }
+  .duel .note { font-size:28px; line-height:1.35; padding-bottom:6px; }
+  .events { margin-top:auto; display:grid; grid-template-columns:repeat(3,1fr); gap:0 36px; }
+  .events div { border-top:1px solid var(--line); padding-top:18px; font-size:24px; line-height:1.4; color:var(--muted); }
+  .events b { color:var(--ink); }
+
+  /* EKRAN */
+  .stage.shotpage { padding:64px 96px 76px; }
+  .stage.shotpage .kicker { margin-bottom:28px; }
+  .shot { flex:1; min-height:0; display:flex; justify-content:center; }
+  .shot img { height:100%; max-width:100%; object-fit:contain; border:2px solid var(--ink); }
+
+  @media print {
+    html,body { overflow:visible; background:var(--bg); }
+    #deck { position:static; display:block; }
+    .stage { display:flex !important; position:relative; left:0; top:0; transform:none !important; page-break-after:always; }
+    @page { size:1920px 1080px; margin:0; }
+  }
 </style>
 </head>
 <body>
+<div id="deck">
 
-<section class="on">
-  <div class="kicker">OKX TR Agentic Trading Hackathon · 12 Eylül 2026 · Komünite Space</div>
-  <h1 style="font-size:120px">okx-agent</h1>
-  <p class="sub" style="font-size:36px;color:var(--ink);margin-top:28px">OKX TR spot piyasasında <b>gerçek parayla</b> çalışan otonom trading ajanı.<br>LLM karar verir, kurallar koddadır, çıkış borsadadır, her karar zincirdedir.</p>
-  <p class="sub">Bekir Erdem · tek geliştirici · 30 USDT gerçek alt hesap · github.com/Bekirerdem/okx-agent</p>
-  <div class="foot"><span>okx-agent</span><span>1 / 10</span></div>
-</section>
-
-<section>
-  <div class="kicker">Ne yapar</div>
-  <h2>Beş dakikada bir bakar, nadiren alır, kaybetmemeyi kovalar.</h2>
-  <ul>
-    <li><b>Tarar:</b> OKX TR'de 24 saatlik hacmi 1M USD üstü 77 USDT paritesi, her 5 dakikalık mum kapanışında.</li>
-    <li><b>Alır:</b> son 3 saatin dibini delip <b>geri dönmüş</b> coini (stoplar avlandı, fiyat toparladı). Zaten fırlamış coini kovalamaz.</li>
-    <li><b>Satar:</b> girişin +%0,3 … +%0,5 üstünde; hedef ve stop (−%4) <b>borsada</b> durur, ajan çökse de çalışır.</li>
-    <li><b>Bekler:</b> BTC 4 saatte %1'den fazla düştüyse nakitte. 18:50'den sonra yeni giriş yok, 19:15'te her şey nakit.</li>
-  </ul>
-  <div class="foot"><span>okx-agent</span><span>2 / 10</span></div>
-</section>
-
-<section>
-  <div class="kicker">Bir karar nasıl doğar</div>
-  <h2>Beş rol, tek hat. LLM yalnız ortadaki kutuda.</h2>
-  <div class="flow">
-    <div><div class="t">Tarayıcı<small>ATK MCP · market · news · smartmoney</small></div><p>BTC filtresi · dip avı sinyali · BTC'ye göre güç ≤ +%2 · emir defteri alış/satış oranı · haber ve duygu · smart money · <b>RSI, EMA 20/50, ATR, VWAP, hacim oranı</b></p></div>
-    <div><div class="t llm">Karar<small>LLM · Claude → Gemini → kural</small></div><p>Adayları <b>seçer ya da reddeder, gerekçesiyle</b>. Boyut, stop, fren hakkında söz hakkı yok. Araçsız ve boş dizinde çalışır; çıktısı kodda doğrulanır.</p></div>
-    <div><div class="t">Risk<small>kod · birim testli</small></div><p>Pozisyon <b>kasanın %12,5'i</b> · stop <b>−%4</b> · aynı anda ≤3 · günde ≤10 · gün zararı <b>−%2</b> → fren · emir defteri &lt; 0,7 → aday LLM'e gitmez</p></div>
-    <div><div class="t">Emir<small>ATK MCP · spot · account</small></div><p>Limit alış + <b>OCO (hedef + stop) borsada</b> · 120 sn'de dolmazsa iptal · +%0,35 görülünce stop girişin üstüne (kâr kilidi) · 19:15 nakit</p></div>
-    <div><div class="t">Günlük<small>JSONL · Telegram · panel · X Layer</small></div><p>Her tarama, karar, ret ve emir <b>gerekçesiyle</b> kayıtta. Kararlar 15 dakikada bir hash'lenip X Layer'a yazılır.</p></div>
+<section class="stage on">
+  <div class="kicker"><span>OKX TR Agentic Trading Hackathon</span><span>12 Eylül 2026 · Komünite Space</span></div>
+  <h1>okx-agent</h1>
+  <p class="lead">OKX TR spot piyasasında <b>gerçek parayla</b> çalışan otonom trading ajanı.</p>
+  <div class="thesis">
+    <div><small>01</small>LLM seçer.</div>
+    <div><small>02</small>Kurallar koddadır.</div>
+    <div><small>03</small>Çıkış borsadadır.</div>
   </div>
-  <div class="foot"><span>okx-agent</span><span>3 / 10</span></div>
+  <div class="foot"><span>Bekir Erdem · tek geliştirici · 30 USDT gerçek alt hesap</span><span>github.com/Bekirerdem/okx-agent · 1 / 5</span></div>
 </section>
 
-<section>
-  <div class="kicker">OKX Agent Trade Kit</div>
-  <h2>Her veri ve her emir ATK MCP üzerinden. 5 modül, 18 araç.</h2>
-  <table>
-    <tr><th>Modül</th><th>Araçlar</th><th>Ne için</th></tr>
-    <tr><td class="mono">market</td><td class="mono">get_tickers · get_instruments · get_candles · get_ticker · get_orderbook</td><td>izleme listesi, lot kuralları, 5 dk mumlar, son fiyat, ±%1 defter dengesi</td></tr>
-    <tr><td class="mono">spot</td><td class="mono">place_order (ekli TP/SL) · get_order · cancel_order · place_algo_order (OCO) · amend_algo_order · get_algo_orders · cancel_algo_order · get_fills</td><td>giriş, takip, iptal, borsa tarafı hedef/stop, kâr kilidi, gerçekleşen işlemler</td></tr>
-    <tr><td class="mono">account</td><td class="mono">get_balance</td><td>kasa, kullanılabilir ve dondurulmuş bakiye</td></tr>
-    <tr><td class="mono">news</td><td class="mono">get_by_coin · get_coin_sentiment · get_latest</td><td>haber vetosu, duygu skoru, haber adayı, saat başı piyasa notu</td></tr>
-    <tr><td class="mono">smartmoney</td><td class="mono">get_signal_overview_by_filter</td><td>lider trader long oranı, kalabalık uyarısı</td></tr>
-  </table>
-  <p class="sub">Bugün <b>998 çağrı</b>. Piyasa verisi için anahtarsız REST yedeği var; yedek asla emir göndermez. Aynı yapılandırma <code class="mono">site = "global"</code> ile OKX Global'e bağlanır.</p>
-  <div class="foot"><span>okx-agent</span><span>4 / 10</span></div>
-</section>
-
-<section>
-  <div class="kicker">Bugün gerçekten ne oldu · 09:00 – 18:10</div>
-  <div class="num">
-    <div><div class="n">57</div><div class="k">tarama · 77 parite · 5 dakikada bir</div></div>
-    <div><div class="n">3</div><div class="k">Karar turu · 2 seçim, 1 ret · her biri gerekçeli</div></div>
-    <div><div class="n">2</div><div class="k">gerçek işlem · STORJ stop <span class="dn">−0,094 USDT</span> (kasanın %0,3'ü) · RAY açık, hedef ve stop borsada</div></div>
-    <div><div class="n">10</div><div class="k">X Layer kaydı · kararların SHA-256 özeti zincirde</div></div>
-    <div><div class="n">998</div><div class="k">ATK MCP çağrısı · 10 farklı araç</div></div>
-    <div><div class="n dn">−%0,5</div><div class="k">gün · kovalayan naif bot aynı veride −%0,4 · performans puanlanmıyor, disiplin ölçülüyor</div></div>
+<section class="stage">
+  <div class="kicker"><span>Nasıl çalışır</span><span>her 5 dakikada bir · 70 parite</span></div>
+  <h2>Bir karar beş adımdan geçer.<br>LLM yalnız birinde konuşur.</h2>
+  <div class="hat">
+    <div><div class="num">1</div><div class="role">Tara<small>kod</small></div><p>BTC düştüyse dur. Son 3 saatin dibini delip <b>geri dönen</b> coini bul. Fırlamış coini kovalama.</p></div>
+    <div class="llm"><div class="num">2</div><div class="role">Karar<small>LLM · Claude</small></div><p>Adayı <b>seç ya da reddet</b>, gerekçesini yaz. Boyut, stop ve fren hakkında söz hakkı yok.</p></div>
+    <div><div class="num">3</div><div class="role">Risk<small>kod</small></div><p>İşlem başına <b>kasanın %0,5'i</b>. Aynı anda 3 pozisyon. Gün −%2'de fren: her şey nakit.</p></div>
+    <div><div class="num">4</div><div class="role">Emir<small>borsa</small></div><p>Limit alış. <b>Hedef ve stop OKX'te</b> durur; ajan, laptop ya da internet düşse de pozisyon korumasız kalmaz.</p></div>
+    <div><div class="num">5</div><div class="role">Kayıt<small>Telegram · panel · X Layer</small></div><p>Seçim, ret, alış, stop: hepsi gerekçesiyle. 15 dakikada bir özeti <b>zincire</b> yazılır.</p></div>
   </div>
-  <p class="sub" style="margin-top:40px"><b>WIF reddi, 16:31:</b> "dip avı sığ, ATR %0,14, düşen bıçak riski, hedefe hareket gelmez." 70 dakika sonra ölçtük: coin ±%0,26 bandında kaldı, hedef görülmedi. <b>Ret gerekçeliydi ve doğru çıktı.</b></p>
-  <div class="foot"><span>okx-agent</span><span>5 / 10</span></div>
+  <p class="proof"><b>WIF, 16:31, reddedildi:</b> "dip sığ, düşen bıçak riski." 70 dakika sonra ölçtük: hedef görülmedi. Ret doğruydu.</p>
+  <div class="foot"><span>okx-agent</span><span>2 / 5</span></div>
 </section>
 
-<section>
-  <div class="kicker">Panel · üç soru</div>
-  <div class="shot"><img src="panel.png" alt="okx-agent paneli"></div>
-  <p class="sub" style="margin-top:14px;font-size:22px">Param ne durumda · Ajan şu an ne yapıyor · Neden güvende. Canlı fiyat, son karar ve gerekçesi, olan biten, X Layer kayıtları. Sunumda canlı: tünel adresi · yedek: okx-agent-panel.pages.dev</p>
-  <div class="foot"><span>okx-agent</span><span>6 / 10</span></div>
-</section>
-
-<section>
-  <div class="kicker">Telegram · cebinden kontrol</div>
-  <h2>Ajan sana yazar, sen ajana sorarsın, gerekirse durdurursun.</h2>
+<section class="stage">
+  <div class="kicker"><span>Telegram</span><span>yalnız sahibinin sohbeti</span></div>
+  <h2>Ajan sana yazar. Sen sorarsın.<br>Gerekirse durdurursun.</h2>
   <div class="cols">
     <div class="cmd">
       <code>/durum</code><span>kasa, BTC filtresi, pozisyon, işlem sayısı</span>
-      <code>/pozisyon</code><span>açık pozisyonlar, anlık kâr/zarar</span>
-      <code>/adaylar</code><span>son taramanın adayları ve Karar'ın gerekçesi</span>
-      <code>/neden COIN</code><span>o coin hakkındaki son gerekçeler</span>
+      <code>/pozisyon</code><span>açık pozisyon, anlık kâr/zarar</span>
+      <code>/adaylar</code><span>son taramanın adayları ve gerekçe</span>
+      <code>/neden COIN</code><span>o coin için yazılan gerekçeler</span>
       <code>/kurallar</code><span>risk kuralları</span>
-      <code>/rapor</code><span>anlık performans dökümü</span>
-      <code>/zincir</code><span>X Layer denetim izi</span>
+      <code>/rapor</code><span>performans dökümü</span>
+      <code>/zincir</code><span>X Layer kayıtları</span>
       <code>/dur</code><span class="dn">acil fren: her şeyi sat, yeni işlem yok</span>
       <code>/devam</code><span>freni kaldır</span>
-      <code>/mod onaylı</code><span>her girişten önce sorar, 60 sn'de "evet" yoksa reddeder</span>
+      <code>/mod onaylı</code><span>her girişten önce sorar; 60 sn'de "evet" yoksa açmaz</span>
+      <code>soru</code><span>"neden işlem açmadın?" · günlükten cevaplar</span>
     </div>
-    <div>
-      <ul>
-        <li><b>Her olay kart olarak düşer:</b> alış doldu, hedef, stop, fren, 15 dakikalık durum, saat başı piyasa notu, zincire yazıldı.</li>
-        <li><b>Serbest soru:</b> "sabahtan beri neden işlem açmadın?" → Karar katmanı günlükten cevaplar, uydurmaz.</li>
-        <li><b>Yalnız sahibinin sohbeti:</b> başka kimse komut veremez.</li>
-      </ul>
-    </div>
-  </div>
-  <div class="foot"><span>okx-agent</span><span>7 / 10</span></div>
-</section>
-
-<section>
-  <div class="kicker">Neden güvende</div>
-  <h2>Para LLM'in elinde değil. Çıkış borsanın elinde.</h2>
-  <ul>
-    <li><b>Kurallar koddadır:</b> boyut, stop, fren, işlem sayısı config'de sabit; prompt'ta görünmez, LLM değiştiremez.</li>
-    <li><b>Çıkış borsadadır:</b> hedef ve stop OCO olarak OKX'te durur. Ajan, laptop ya da internet düşse de pozisyon korumasız kalmaz. Bugün 3 kez hotspot kesildi, hiçbir pozisyon açıkta kalmadı.</li>
-    <li><b>LLM kafestedir:</b> araçsız, boş dizinde, ağa çıkamaz. Haber başlığındaki "şunu al" komutu veridir, talimat değil; çıktısı yalnızca aday listesinden seçimdir ve kodda doğrulanır.</li>
-    <li><b>Düşerse ayağa kalkar:</b> ağ yoksa açılışta 10 sn aralıkla tekrar dener, otomatik yeniden başlar, durum diskte; LLM düşerse kural motoru sürer.</li>
-    <li><b>Kill switch:</b> Telegram <span class="mono">/dur</span> her şeyi satar. API anahtarı yalnız al-sat; çekim kapalı.</li>
-  </ul>
-  <div class="foot"><span>okx-agent</span><span>8 / 10</span></div>
-</section>
-
-<section>
-  <div class="kicker">X Layer · denetim izi</div>
-  <h2>Ajanın günlüğü laptop'ta bir dosya. Zincirdeki özet onu değiştirilemez yapar.</h2>
-  <div class="cols">
-    <div>
-      <ul>
-        <li><b>Ne:</b> X Layer, OKX'in Ethereum L2 zinciri (ZK rollup, gaz OKB). Testnet, chain 1952.</li>
-        <li><b>Nasıl:</b> 15 dakikada bir o aralıktaki kararlar, retler ve emirler bir dosyada toplanır; dosyanın SHA-256 özeti sıfır değerli bir işlemin data alanına yazılır.</li>
-        <li><b>Doğrulama:</b> <span class="mono">bun run verify 10</span> dosyayı yeniden özetler, zincirdekiyle karşılaştırır: EŞLEŞTİ / EŞLEŞMEDİ.</li>
-      </ul>
-    </div>
-    <div>
-      <ul>
-        <li><b>Neden:</b> gerçek parayla otonom karar veren bir ajan hesap verebilmeli. "WIF'i reddettik" iddiası zincirde saat damgalı; sonradan düzenlenemez.</li>
-        <li><b>Testnet neden:</b> bilinçli tercih. Musluktan OKB, sıfır maliyet, fonlu anahtar laptop'ta durmuyor. Mainnet = RPC + chain id değişikliği ve cüzdana OKB; kod aynı.</li>
-        <li><b>Sınır:</b> zincirde özet var, içerik yok. Değişiklik yakalanır, içerik zincirden okunmaz.</li>
-      </ul>
+    <div class="side">
+      <div><b>Her olay kart olur.</b>Alış doldu, hedef, stop, fren, zincire yazıldı.</div>
+      <div><b>Uydurmaz.</b>Cevap günlükten gelir; günlükte yoksa "günlükte yok" der.</div>
+      <div><b>Bugün.</b>12 komut, 1 soru; 15:56'da onaylı moda geçildi.</div>
     </div>
   </div>
-  <div class="foot"><span>okx-agent</span><span>9 / 10</span></div>
+  <div class="foot"><span>okx-agent</span><span>3 / 5</span></div>
 </section>
 
-<section>
-  <div class="kicker">Sınırlar ve sırada</div>
-  <h2>Bugün kazanmadık. Kaybetmedik de. Sistem ayakta kaldı.</h2>
-  <ul>
-    <li><b>Kanıt hafta sonu rejimine ait:</b> 26 haftalık ölçüm Cumartesi spotu için; hafta içi aynı sinyal negatif. Ajan gün tipini bilir.</li>
-    <li><b>Ölü piyasa:</b> BTC bütün gün ±%0,2; 57 taramada 3 aday. Seçicilik çalıştı, fırsat yoktu.</li>
-    <li><b>Sırada:</b> X Layer mainnet · OKX Global adaptörü (aynı kurallar, başka emir katmanı) · çok günlük istatistik · panelden onay · daha küçük hedefle ölü piyasa modu.</li>
-  </ul>
-  <p class="sub" style="margin-top:auto">github.com/Bekirerdem/okx-agent · MIT · Bekir Erdem</p>
-  <div class="foot"><span>okx-agent</span><span>10 / 10</span></div>
+<section class="stage">
+  <div class="kicker"><span>Bugün · gerçek hesap</span><span>10:39 – 19:15</span></div>
+  <div class="nums">
+    <div><div class="n">8<small>sa</small>36<small>dk</small></div><div class="k">çalıştı · 11 yeniden başlatma</div></div>
+    <div><div class="n">65</div><div class="k">tarama · 70 parite</div></div>
+    <div><div class="n">5</div><div class="k">karar · 2 seçim, 3 ret</div></div>
+    <div><div class="n">2</div><div class="k">gerçek işlem</div></div>
+    <div><div class="n">12</div><div class="k">X Layer kaydı</div></div>
+    <div><div class="n">1.675</div><div class="k">ATK MCP çağrısı · 18 araç</div></div>
+  </div>
+  <div class="duel">
+    <div><div class="n dn">−%0,7</div><div class="k">kasa · en büyük kayıp kasanın %0,3'ü</div></div>
+    <div><div class="n dn">−%0,4</div><div class="k">kovalayan naif bot · 14 işlem</div></div>
+    <div class="note">BTC bütün gün ±%0,2 bandında. Fırsat yoktu; seçicilik çalıştı.</div>
+  </div>
+  <div class="events">
+    <div><b>Hotspot 11 kez koptu.</b> Ajan her seferinde kalktı; stop borsada olduğu için hiçbir pozisyon korumasız kalmadı.</div>
+    <div><b>RAY hedefi fitille gördü, ajan kaçırdı.</b> Ders aynı gün uygulandı: hedef de borsaya taşındı.</div>
+    <div><b>STORJ limitten sapıp doldu, stop oldu.</b> Ders: hedef ve stop artık gerçek giriş fiyatına göre yenilenir.</div>
+  </div>
+  <div class="foot"><span>okx-agent</span><span>4 / 5</span></div>
 </section>
 
+<section class="stage shotpage">
+  <div class="kicker"><span>Panel · canlı</span><span>Param ne durumda · Ajan şu an ne yapıyor · Neden güvende</span></div>
+  <div class="shot"><img src="panel.png" alt="okx-agent paneli"></div>
+  <div class="foot"><span>okx-agent-panel.pages.dev</span><span>5 / 5</span></div>
+</section>
+
+</div>
 <script>
-const S = [...document.querySelectorAll("section")]; let i = Math.max(0, Math.min(S.length - 1, (Number(location.hash.slice(1)) || 1) - 1));
+const S = [...document.querySelectorAll(".stage")]; let i = Math.max(0, Math.min(S.length - 1, (Number(location.hash.slice(1)) || 1) - 1));
 const show = () => { S.forEach((s, k) => s.classList.toggle("on", k === i)); location.hash = i + 1; };
+const fit = () => { const s = Math.min(innerWidth / 1920, innerHeight / 1080); for (const st of S) st.style.transform = `translate(-50%,-50%) scale(${s})`; };
+addEventListener("resize", fit); fit();
 addEventListener("keydown", (e) => { if (["ArrowRight", " ", "PageDown"].includes(e.key)) { i = Math.min(S.length - 1, i + 1); show(); } if (["ArrowLeft", "PageUp"].includes(e.key)) { i = Math.max(0, i - 1); show(); } });
 addEventListener("click", (e) => { if (e.target.closest("a")) return; i = e.clientX > innerWidth / 2 ? Math.min(S.length - 1, i + 1) : Math.max(0, i - 1); show(); });
 addEventListener("hashchange", () => { const k = (Number(location.hash.slice(1)) || 1) - 1; if (k !== i && k >= 0 && k < S.length) { i = k; show(); } });

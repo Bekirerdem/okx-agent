@@ -10,5 +10,5 @@ const out = html.replace("<script>", `<script>window.__STATIC__=true;window.__ST
 mkdirSync("dist/sunum", { recursive: true });
 writeFileSync("dist/index.html", out);
 copyFileSync("docs/sunum/index.html", "dist/sunum/index.html");          // slaytlar: /sunum
-if (existsSync("docs/panel.png")) copyFileSync("docs/panel.png", "dist/sunum/panel.png");
+if (existsSync("docs/sunum/panel.png")) copyFileSync("docs/sunum/panel.png", "dist/sunum/panel.png");
 console.log(`dist/index.html yazıldı · ${new Date().toLocaleTimeString("tr-TR", { timeZone: "Europe/Istanbul" })} · kasa ${Number(d.state?.equity ?? 0).toFixed(2)} · ${d.journal.length} günlük satırı`);

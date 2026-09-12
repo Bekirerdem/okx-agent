@@ -7,7 +7,7 @@ LLM aday seçer; boyut, stop ve fren koddadır; hedef ve stop borsada durur; her
 
 ![Bun](https://img.shields.io/badge/Bun-1.3-000000?logo=bun&logoColor=white) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white) ![OKX ATK](https://img.shields.io/badge/OKX_ATK-MCP_1.4-000000) ![X Layer](https://img.shields.io/badge/X_Layer-testnet_1952-4B5563) ![Tests](https://img.shields.io/badge/tests-27_passing-15803d) ![License](https://img.shields.io/badge/license-MIT-c2410c)
 
-![okx-agent paneli](docs/panel.png)
+![okx-agent paneli](docs/sunum/panel.png)
 
 OKX TR Agentic Trading Hackathon, 12 Eylül 2026. Tek geliştirici, 30 USDT gerçek alt hesap, canlı işlem.
 
@@ -201,7 +201,7 @@ src/
   report.ts       performans dökümü
 scripts/          smoke.ts (canlı emir yolu) · verify.ts (zincir doğrulama) · export_panel.ts (statik panel) · anchor_smoke.ts
 tests/            signals · risk · shadow · modules
-docs/             spec.md (tasarım kararları) · sunum/ (slaytlar) · panel.png
+docs/             spec.md (tasarım kararları) · sunum/ (slaytlar + panel.png)
 state/            günlük, durum, batch ve zincir kayıtları (git dışı)
 ```
 
