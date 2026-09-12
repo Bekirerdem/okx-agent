@@ -10,7 +10,8 @@
     "report": "bun run src/report.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "dashboard": "bun run src/dashboard.ts"
+    "dashboard": "bun run src/dashboard.ts",
+    "verify": "bun run scripts/verify.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

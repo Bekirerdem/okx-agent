@@ -2,7 +2,7 @@
 // Günlük sonradan değiştirilemez: jüri zincirdeki hash ile dosyadaki batch'i karşılaştırabilir.
 // Anahtar/gaz yoksa modül kendini kapatır; ajan etkilenmez.
 import { createHash } from "node:crypto";
-import { appendFileSync, mkdirSync } from "node:fs";
+import { appendFileSync, mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
 import { createWalletClient, createPublicClient, http, defineChain, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
@@ -17,7 +17,8 @@ const chain = defineChain({
 });
 
 let batch: string[] = [];
-let seq = 0;
+let seq = (() => { try { return existsSync("state/anchors.jsonl") ? readFileSync("state/anchors.jsonl", "utf-8").trim().split(/?
+/).filter(Boolean).length : 0; } catch { return 0; } })();
 let disabled = !PK;
 let lastErr = "";
 

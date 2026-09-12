@@ -130,7 +130,8 @@ async function refresh() {
   $("clock").textContent = new Date().toLocaleTimeString("tr-TR", { timeZone: "Europe/Istanbul" });
   $("mode").textContent = m ? (m.mode === "live" ? "canlı" : "dry-run") : "bağlı değil";
   $("mode").className = "mode" + (m?.mode === "live" ? " live" : "");
-  $("hdr").textContent = m ? `${m.universe} parite · LLM ${m.llm} · ${m.mcpCalls} MCP çağrısı` : "";
+  const age = m ? Math.round((Date.now() - m.ts) / 1000) : null;
+  $("hdr").innerHTML = m ? `${m.universe} parite · LLM ${m.llm} · ${m.mcpCalls} MCP çağrısı · <span class="${age > 180 ? "dn" : ""}">nabız ${age} sn önce${age > 180 ? " · AJAN SESSİZ" : ""}</span>` : "";
   if (st) {
     $("eq").innerHTML = `${fmt(st.equity)}<small>USDT</small>`;
     const p = st.dayStartEquity ? (st.equity / st.dayStartEquity - 1) * 100 : 0;

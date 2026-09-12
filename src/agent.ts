@@ -6,7 +6,7 @@ import { getUniverse, getInstruments, getCandles, getLast, getBook, getSmartMone
 import { detectSweep, relStrength, btcGate, dayRangePct, targetPrice, bookImbalance, type Bar } from "./signals";
 import { positionNotional, canOpen, dailyStopHit, stopPrice, roundSize, roundPrice } from "./risk";
 import { getBalance, placeLimitBuy, getOrder, cancelOrder, sellMarket } from "./exchange";
-import { decide, type Candidate } from "./llm";
+import { decide, ask, type Candidate } from "./llm";
 import { log, trTime } from "./journal";
 import { flush as anchorFlush, anchorStatus, anchorAddress } from "./anchor";
 import { startCommandLoop } from "./commands";
@@ -18,7 +18,7 @@ type State = {
   day: string; dayStartEquity: number; equity: number; halted: boolean; tradesToday: number;
   positions: Record<string, Position>; pending: Record<string, Pending>; cooldown: Record<string, number>; seen: Record<string, number>;
   closed: { instId: string; entry: number; exit: number; qty: number; pnl: number; why: string; ts: number }[];
-  lastBucket: number;
+  lastBucket: number; postmortem?: boolean;
 };
 
 const BAR_MS = 15 * 60_000;
@@ -124,6 +124,15 @@ async function main() {
       // gün sonu ve fren
       if (minutes >= toMin(CFG.session.flat)) {
         if (Object.keys(st.positions).length || Object.keys(st.pending).length) { await flattenAll("gün sonu"); log("flat", `${hm}: zorunlu nakit tamam. Gün getirisi ${((st.equity / st.dayStartEquity - 1) * 100).toFixed(2)}%`); }
+        if (!st.postmortem) {
+          st.postmortem = true; saveState(st);
+          try {
+            const journal = existsSync(CFG.paths.journal) ? readFileSync(CFG.paths.journal, "utf-8").trim().split(String.fromCharCode(10)).slice(-200).map((l) => { try { const e = JSON.parse(l); return `${e.ts.slice(11, 16)}Z ${e.role}·${e.kind}: ${e.msg}${e.data?.reason ? " → " + e.data.reason : ""}`; } catch { return ""; } }).join(String.fromCharCode(10)) : "";
+            const text = await ask("Günün post-mortem'ini yaz: ne oldu, kaç tarama, kaç aday, neden girdin/girmedin, risk kafesi ne zaman devreye girdi, yarın için tek ders. En fazla 10 cümle.", `GÜN: ${st.day} · başlangıç ${st.dayStartEquity.toFixed(2)} → bitiş ${st.equity.toFixed(2)} USDT · kapanan işlem ${st.closed.length}
+${journal}`);
+            log("info", `GÜN SONU ANLATISI (Seçici): ${text}`);
+          } catch (e) { log("error", `post-mortem: ${(e as Error).message?.slice(0, 120)}`); }
+        }
       } else if (!st.halted && dailyStopHit(st.equity, st.dayStartEquity, CFG.risk)) {
         st.halted = true; await flattenAll("gün freni");
         log("halt", `GÜN FRENİ: özkaynak ${st.equity.toFixed(2)} (${((st.equity / st.dayStartEquity - 1) * 100).toFixed(2)}%). Bugün yeni işlem yok.`);
